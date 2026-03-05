@@ -1,0 +1,28 @@
+CREATE TABLE warrior (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    code TEXT NOT NULL
+);
+
+CREATE TABLE battle (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp INTEGER NOT NULL,
+    winner_name TEXT,
+    warriors_involved TEXT NOT NULL,
+    status TEXT NOT NULL
+);
+
+insertWarrior:
+INSERT INTO warrior (name, code) VALUES (?, ?);
+
+selectAllWarriors:
+SELECT * FROM warrior;
+
+deleteWarrior:
+DELETE FROM warrior WHERE id = ?;
+
+insertBattle:
+INSERT INTO battle (timestamp, winner_name, warriors_involved, status) VALUES (?, ?, ?, ?);
+
+selectAllBattles:
+SELECT * FROM battle ORDER BY timestamp DESC;
