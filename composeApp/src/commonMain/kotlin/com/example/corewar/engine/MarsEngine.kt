@@ -42,21 +42,31 @@ class MarsEngine {
         CoreWarColor(0xFFFFFF00)  // Yellow
     )
 
+    fun runBatch(state: BattleState, cycles: Int): BattleState {
+        var currentState = state
+        repeat(cycles) {
+            if (currentState.status != BattleStatus.RUNNING) return currentState
+            currentState = step(currentState)
+        }
+        return currentState
+    }
+
     fun step(state: BattleState): BattleState {
         if (state.status != BattleStatus.RUNNING) return state
 
-        var nextState = state
         val memSize = state.memory.size
+        var currentMemory = state.memory.copyOf()
+        var currentWarriors = state.warriors.toMutableList()
 
         // Handle Chaos Mode events
         if (state.chaosMode && Random.nextInt(1000) == 0) {
-            nextState = handleChaosEvent(nextState)
+            val chaosResult = handleChaosEvent(state.copy(memory = currentMemory, warriors = currentWarriors))
+            currentMemory = chaosResult.memory
+            currentWarriors = chaosResult.warriors.toMutableList()
         }
 
-        val nextWarriors = nextState.warriors.map { it.copy(threads = it.threads.toMutableList()) }.toMutableList()
-
-        for (warriorIdx in nextWarriors.indices) {
-            val warrior = nextWarriors[warriorIdx]
+        for (warriorIdx in currentWarriors.indices) {
+            val warrior = currentWarriors[warriorIdx]
             val threads = warrior.threads.toMutableList()
             if (threads.isEmpty()) continue
 
@@ -66,18 +76,17 @@ class MarsEngine {
             repeat(executions) {
                 if (threads.isEmpty()) return@repeat
                 val pc = threads.removeAt(0)
-                val cell = nextState.memory[pc.mod(memSize)]
+                val cell = currentMemory[pc.mod(memSize)]
 
                 // Protected zone speed penalty
-                if (cell.type == CellType.PROTECTED && state.cycle % 2 != 0) {
+                val penaltyChance = if (warrior.specialPowers.contains(SpecialPower.REDUCE_PENALTY)) 15 else 50
+                if (cell.type == CellType.PROTECTED && Random.nextInt(100) < penaltyChance) {
                     threads.add(0, pc)
                     return@repeat
                 }
 
-                val instr = cell.instruction
-                val result = execute(instr, pc, warriorIdx, nextState)
-
-                nextState = result.nextState
+                val result = execute(cell.instruction, pc, warriorIdx, currentMemory, state.cycle)
+                currentMemory = result.memory
 
                 if (result.nextPc != null) {
                     threads.add(result.nextPc.mod(memSize))
@@ -89,13 +98,13 @@ class MarsEngine {
                 // Process Shield logic
                 if (threads.isEmpty() && warrior.specialPowers.contains(SpecialPower.PROCESS_SHIELD) && !warrior.shieldUsed) {
                     threads.add(Random.nextInt(memSize))
-                    nextWarriors[warriorIdx] = nextWarriors[warriorIdx].copy(shieldUsed = true)
+                    currentWarriors[warriorIdx] = currentWarriors[warriorIdx].copy(shieldUsed = true)
                 }
             }
-            nextWarriors[warriorIdx] = nextWarriors[warriorIdx].copy(threads = threads)
+            currentWarriors[warriorIdx] = currentWarriors[warriorIdx].copy(threads = threads)
         }
 
-        val aliveWarriors = nextWarriors.filter { it.threads.isNotEmpty() }
+        val aliveWarriors = currentWarriors.filter { it.threads.isNotEmpty() }
         val status = when {
             aliveWarriors.isEmpty() -> BattleStatus.DRAW
             aliveWarriors.size == 1 && state.warriors.size > 1 -> BattleStatus.WARRIOR_WINS
@@ -103,8 +112,9 @@ class MarsEngine {
             else -> BattleStatus.RUNNING
         }
 
-        return nextState.copy(
-            warriors = nextWarriors,
+        return state.copy(
+            memory = currentMemory,
+            warriors = currentWarriors,
             cycle = state.cycle + 1,
             status = status,
             winnerId = if (status == BattleStatus.WARRIOR_WINS) aliveWarriors.first().id else null
@@ -113,11 +123,12 @@ class MarsEngine {
 
     private fun handleChaosEvent(state: BattleState): BattleState {
         val memSize = state.memory.size
+        val newMemory = state.memory.copyOf()
         return when (Random.nextInt(2)) {
             0 -> { // MEMORY GLITCH
                 val pos = Random.nextInt(memSize)
-                state.memory[pos] = state.memory[pos].copy(instruction = Instruction(Opcode.DAT), ownerId = null)
-                state
+                newMemory[pos] = newMemory[pos].copy(instruction = Instruction(Opcode.DAT), ownerId = null)
+                state.copy(memory = newMemory)
             }
             else -> { // PROCESS WARP
                 val nextWarriors = state.warriors.map { warrior ->
@@ -130,13 +141,14 @@ class MarsEngine {
     }
 
     private data class ExecutionResult(
-        val nextState: BattleState,
+        val memory: Array<MemoryCell>,
         val nextPc: Int?,
         val spawnPc: Int? = null
     )
 
-    private fun execute(instr: Instruction, pc: Int, ownerId: Int, state: BattleState): ExecutionResult {
-        val memSize = state.memory.size
+    private fun execute(instr: Instruction, pc: Int, ownerId: Int, memory: Array<MemoryCell>, cycle: Int): ExecutionResult {
+        val memSize = memory.size
+        val workingMemory = memory.copyOf()
 
         fun getAddr(mode: AddressMode, value: Int, currentPc: Int): Int {
             return when (mode) {
@@ -144,40 +156,40 @@ class MarsEngine {
                 AddressMode.DIRECT -> (currentPc + value).mod(memSize)
                 AddressMode.INDIRECT_B -> {
                     val target = (currentPc + value).mod(memSize)
-                    (target + state.memory[target].instruction.valueB).mod(memSize)
+                    (target + workingMemory[target].instruction.valueB).mod(memSize)
                 }
                 AddressMode.PRE_DEC_B -> {
                     val target = (currentPc + value).mod(memSize)
-                    val oldInstr = state.memory[target].instruction
+                    val oldInstr = workingMemory[target].instruction
                     val newInstr = oldInstr.copy(valueB = oldInstr.valueB - 1)
-                    state.memory[target] = state.memory[target].copy(instruction = newInstr)
+                    workingMemory[target] = workingMemory[target].copy(instruction = newInstr)
                     (target + newInstr.valueB).mod(memSize)
                 }
                 AddressMode.POST_INC_B -> {
                     val target = (currentPc + value).mod(memSize)
-                    val oldInstr = state.memory[target].instruction
+                    val oldInstr = workingMemory[target].instruction
                     val addr = (target + oldInstr.valueB).mod(memSize)
                     val newInstr = oldInstr.copy(valueB = oldInstr.valueB + 1)
-                    state.memory[target] = state.memory[target].copy(instruction = newInstr)
+                    workingMemory[target] = workingMemory[target].copy(instruction = newInstr)
                     addr
                 }
                 AddressMode.INDIRECT_A -> {
                     val target = (currentPc + value).mod(memSize)
-                    (target + state.memory[target].instruction.valueA).mod(memSize)
+                    (target + workingMemory[target].instruction.valueA).mod(memSize)
                 }
                 AddressMode.PRE_DEC_A -> {
                     val target = (currentPc + value).mod(memSize)
-                    val oldInstr = state.memory[target].instruction
+                    val oldInstr = workingMemory[target].instruction
                     val newInstr = oldInstr.copy(valueA = oldInstr.valueA - 1)
-                    state.memory[target] = state.memory[target].copy(instruction = newInstr)
+                    workingMemory[target] = workingMemory[target].copy(instruction = newInstr)
                     (target + newInstr.valueA).mod(memSize)
                 }
                 AddressMode.POST_INC_A -> {
                     val target = (currentPc + value).mod(memSize)
-                    val oldInstr = state.memory[target].instruction
+                    val oldInstr = workingMemory[target].instruction
                     val addr = (target + oldInstr.valueA).mod(memSize)
                     val newInstr = oldInstr.copy(valueA = oldInstr.valueA + 1)
-                    state.memory[target] = state.memory[target].copy(instruction = newInstr)
+                    workingMemory[target] = workingMemory[target].copy(instruction = newInstr)
                     addr
                 }
             }
@@ -186,148 +198,129 @@ class MarsEngine {
         fun getValue(mode: AddressMode, value: Int, currentPc: Int, isA: Boolean): Int {
             if (mode == AddressMode.IMMEDIATE) return value
             val addr = getAddr(mode, value, currentPc)
-            val targetInstr = state.memory[addr].instruction
+            val targetInstr = workingMemory[addr].instruction
             return if (isA) targetInstr.valueA else targetInstr.valueB
         }
 
         fun writeMemory(addr: Int, cell: MemoryCell) {
             val target = addr.mod(memSize)
-            val targetCell = state.memory[target]
-            if (targetCell.type == CellType.PROTECTED) return // Immunized against overwrite
+            val targetCell = workingMemory[target]
+            if (targetCell.type == CellType.PROTECTED) return
 
-            var newCell = cell.copy(lastModifiedCycle = state.cycle, ownerId = ownerId, writeCount = targetCell.writeCount + 1)
-
+            var newCell = cell.copy(lastModifiedCycle = cycle, ownerId = ownerId, writeCount = targetCell.writeCount + 1)
             if (newCell.type == CellType.VOLATILE && newCell.writeCount >= 5) {
                 newCell = newCell.copy(instruction = Instruction(Opcode.DAT), ownerId = null)
             }
-
-            state.memory[target] = newCell
+            workingMemory[target] = newCell
         }
 
         return when (instr.opcode) {
-            Opcode.DAT -> ExecutionResult(state, null)
+            Opcode.DAT -> ExecutionResult(workingMemory, null)
             Opcode.MOV -> {
                 val srcAddr = getAddr(instr.modeA, instr.valueA, pc)
                 val destAddr = getAddr(instr.modeB, instr.valueB, pc)
                 if (instr.modeA == AddressMode.IMMEDIATE) {
-                    val targetCell = state.memory[destAddr]
+                    val targetCell = workingMemory[destAddr]
                     val newInstr = targetCell.instruction.copy(valueB = instr.valueA)
                     writeMemory(destAddr, targetCell.copy(instruction = newInstr))
                 } else {
-                    writeMemory(destAddr, state.memory[srcAddr])
+                    writeMemory(destAddr, workingMemory[srcAddr])
                 }
-                ExecutionResult(state, pc + 1)
+                ExecutionResult(workingMemory, pc + 1)
             }
             Opcode.ADD -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
                 val destAddr = getAddr(instr.modeB, instr.valueB, pc)
-                val targetCell = state.memory[destAddr]
+                val targetCell = workingMemory[destAddr]
                 val newInstr = targetCell.instruction.copy(valueB = targetCell.instruction.valueB + valA)
                 writeMemory(destAddr, targetCell.copy(instruction = newInstr))
-                ExecutionResult(state, pc + 1)
+                ExecutionResult(workingMemory, pc + 1)
             }
             Opcode.SUB -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
                 val destAddr = getAddr(instr.modeB, instr.valueB, pc)
-                val targetCell = state.memory[destAddr]
+                val targetCell = workingMemory[destAddr]
                 val newInstr = targetCell.instruction.copy(valueB = targetCell.instruction.valueB - valA)
                 writeMemory(destAddr, targetCell.copy(instruction = newInstr))
-                ExecutionResult(state, pc + 1)
+                ExecutionResult(workingMemory, pc + 1)
             }
             Opcode.MUL -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
                 val destAddr = getAddr(instr.modeB, instr.valueB, pc)
-                val targetCell = state.memory[destAddr]
+                val targetCell = workingMemory[destAddr]
                 val newInstr = targetCell.instruction.copy(valueB = targetCell.instruction.valueB * valA)
                 writeMemory(destAddr, targetCell.copy(instruction = newInstr))
-                ExecutionResult(state, pc + 1)
+                ExecutionResult(workingMemory, pc + 1)
             }
             Opcode.DIV -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
                 val destAddr = getAddr(instr.modeB, instr.valueB, pc)
                 if (valA == 0) {
-                     ExecutionResult(state, null) // Kill process
+                     ExecutionResult(workingMemory, null)
                 } else {
-                    val targetCell = state.memory[destAddr]
+                    val targetCell = workingMemory[destAddr]
                     val newInstr = targetCell.instruction.copy(valueB = targetCell.instruction.valueB / valA)
                     writeMemory(destAddr, targetCell.copy(instruction = newInstr))
-                    ExecutionResult(state, pc + 1)
+                    ExecutionResult(workingMemory, pc + 1)
                 }
             }
             Opcode.MOD -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
                 val destAddr = getAddr(instr.modeB, instr.valueB, pc)
                 if (valA == 0) {
-                     ExecutionResult(state, null) // Kill process
+                     ExecutionResult(workingMemory, null)
                 } else {
-                    val targetCell = state.memory[destAddr]
+                    val targetCell = workingMemory[destAddr]
                     val newInstr = targetCell.instruction.copy(valueB = targetCell.instruction.valueB % valA)
                     writeMemory(destAddr, targetCell.copy(instruction = newInstr))
-                    ExecutionResult(state, pc + 1)
+                    ExecutionResult(workingMemory, pc + 1)
                 }
             }
-            Opcode.JMP -> {
-                val destAddr = getAddr(instr.modeA, instr.valueA, pc)
-                ExecutionResult(state, destAddr)
-            }
+            Opcode.JMP -> ExecutionResult(workingMemory, getAddr(instr.modeA, instr.valueA, pc))
             Opcode.JMZ -> {
                 val valB = getValue(instr.modeB, instr.valueB, pc, false)
-                if (valB == 0) {
-                    ExecutionResult(state, getAddr(instr.modeA, instr.valueA, pc))
-                } else {
-                    ExecutionResult(state, pc + 1)
-                }
+                if (valB == 0) ExecutionResult(workingMemory, getAddr(instr.modeA, instr.valueA, pc))
+                else ExecutionResult(workingMemory, pc + 1)
             }
             Opcode.JMN -> {
                 val valB = getValue(instr.modeB, instr.valueB, pc, false)
-                if (valB != 0) {
-                    ExecutionResult(state, getAddr(instr.modeA, instr.valueA, pc))
-                } else {
-                    ExecutionResult(state, pc + 1)
-                }
+                if (valB != 0) ExecutionResult(workingMemory, getAddr(instr.modeA, instr.valueA, pc))
+                else ExecutionResult(workingMemory, pc + 1)
             }
             Opcode.DJN -> {
                 val destBAddr = getAddr(instr.modeB, instr.valueB, pc)
-                val targetCell = state.memory[destBAddr]
+                val targetCell = workingMemory[destBAddr]
                 val newValueB = targetCell.instruction.valueB - 1
                 val newInstr = targetCell.instruction.copy(valueB = newValueB)
                 writeMemory(destBAddr, targetCell.copy(instruction = newInstr))
-                if (newValueB != 0) {
-                    ExecutionResult(state, getAddr(instr.modeA, instr.valueA, pc))
-                } else {
-                    ExecutionResult(state, pc + 1)
-                }
+                if (newValueB != 0) ExecutionResult(workingMemory, getAddr(instr.modeA, instr.valueA, pc))
+                else ExecutionResult(workingMemory, pc + 1)
             }
-            Opcode.SPL -> {
-                val destAddr = getAddr(instr.modeA, instr.valueA, pc)
-                ExecutionResult(state, pc + 1, destAddr)
-            }
+            Opcode.SPL -> ExecutionResult(workingMemory, pc + 1, getAddr(instr.modeA, instr.valueA, pc))
             Opcode.CMP -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
                 val valB = getValue(instr.modeB, instr.valueB, pc, false)
-                if (valA == valB) {
-                    ExecutionResult(state, pc + 2)
-                } else {
-                    ExecutionResult(state, pc + 1)
-                }
+                if (valA == valB) ExecutionResult(workingMemory, pc + 2)
+                else ExecutionResult(workingMemory, pc + 1)
             }
             Opcode.SLT -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
                 val valB = getValue(instr.modeB, instr.valueB, pc, false)
-                if (valA < valB) {
-                    ExecutionResult(state, pc + 2)
-                } else {
-                    ExecutionResult(state, pc + 1)
-                }
+                if (valA < valB) ExecutionResult(workingMemory, pc + 2)
+                else ExecutionResult(workingMemory, pc + 1)
             }
-            Opcode.NOP -> ExecutionResult(state, pc + 1)
+            Opcode.NOP -> ExecutionResult(workingMemory, pc + 1)
         }
     }
 
     suspend fun runWithDelay(state: BattleState, delayMs: Long, onStep: (BattleState) -> Unit) {
         var currentState = state
         while (currentState.status == BattleStatus.RUNNING) {
-            currentState = step(currentState)
+            currentState = if (delayMs < 10 && delayMs > 0) {
+                 runBatch(currentState, 10)
+            } else {
+                 step(currentState)
+            }
             onStep(currentState)
             if (delayMs > 0) delay(delayMs)
         }

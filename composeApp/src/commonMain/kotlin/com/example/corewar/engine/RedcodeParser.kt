@@ -7,50 +7,79 @@ data class ParseError(val line: Int, val message: String)
 class RedcodeParser {
 
     fun parse(code: String): List<Instruction> {
-        val lines = code.lines().map { it.substringBefore(";").trim() }.filter { it.isNotEmpty() }
-        return lines.map { parseLine(it) }
+        val labels = mutableMapOf<String, Int>()
+        val rawLines = code.lines().map { it.substringBefore(";").trim() }
+        var instrCount = 0
+
+        // Pass 1: Resolve Labels
+        rawLines.forEach { line ->
+            if (line.isEmpty()) return@forEach
+            val tokens = line.split(Regex("[ ,]+")).filter { it.isNotEmpty() }
+            if (tokens.isEmpty()) return@forEach
+
+            val firstToken = tokens[0].uppercase()
+            if (!Opcode.values().any { it.name == firstToken }) {
+                // It's a label
+                val labelName = tokens[0].removeSuffix(":")
+                labels[labelName] = instrCount
+                if (tokens.size > 1) instrCount++
+            } else {
+                instrCount++
+            }
+        }
+
+        // Pass 2: Parse Instructions
+        val instructions = mutableListOf<Instruction>()
+        var currentIdx = 0
+        rawLines.forEach { line ->
+            if (line.isEmpty()) return@forEach
+            val tokens = line.split(Regex("[ ,]+")).filter { it.isNotEmpty() }
+            if (tokens.isEmpty()) return@forEach
+
+            val opcodeToken: String
+            val args: List<String>
+
+            val firstToken = tokens[0].uppercase()
+            if (!Opcode.values().any { it.name == firstToken }) {
+                if (tokens.size == 1) return@forEach
+                opcodeToken = tokens[1]
+                args = tokens.drop(2)
+            } else {
+                opcodeToken = tokens[0]
+                args = tokens.drop(1)
+            }
+
+            val opcode = Opcode.valueOf(opcodeToken.uppercase())
+
+            val instr = when (args.size) {
+                0 -> Instruction(opcode)
+                1 -> {
+                    val (mode, value) = parseArgument(args[0], labels, currentIdx)
+                    Instruction(opcode, mode, value)
+                }
+                else -> {
+                    val (modeA, valA) = parseArgument(args[0], labels, currentIdx)
+                    val (modeB, valB) = parseArgument(args[1], labels, currentIdx)
+                    Instruction(opcode, modeA, valA, modeB, valB)
+                }
+            }
+            instructions.add(instr)
+            currentIdx++
+        }
+
+        return instructions
     }
 
     fun validate(code: String): List<ParseError> {
-        val errors = mutableListOf<ParseError>()
-        code.lines().forEachIndexed { index, line ->
-            val cleanLine = line.substringBefore(";").trim()
-            if (cleanLine.isNotEmpty()) {
-                try {
-                    parseLine(cleanLine)
-                } catch (e: Exception) {
-                    errors.add(ParseError(index + 1, e.message ?: "Invalid syntax"))
-                }
-            }
-        }
-        return errors
-    }
-
-    private fun parseLine(line: String): Instruction {
-        // Correct regex to split by whitespace and/or comma
-        val tokens = line.split(Regex("[ ,]+")).filter { it.isNotEmpty() }
-        if (tokens.isEmpty()) throw Exception("Empty instruction")
-
-        val opcode = try {
-            Opcode.valueOf(tokens[0].uppercase())
+        return try {
+            parse(code)
+            emptyList()
         } catch (e: Exception) {
-            throw Exception("Unknown opcode: ${tokens[0]}")
+            listOf(ParseError(0, e.message ?: "Unknown error"))
         }
-
-        if (tokens.size == 1) return Instruction(opcode)
-
-        val partA = tokens[1]
-        val (modeA, valA) = parseArgument(partA)
-
-        if (tokens.size == 2) return Instruction(opcode, modeA, valA)
-
-        val partB = tokens[2]
-        val (modeB, valB) = parseArgument(partB)
-
-        return Instruction(opcode, modeA, valA, modeB, valB)
     }
 
-    private fun parseArgument(arg: String): Pair<AddressMode, Int> {
+    private fun parseArgument(arg: String, labels: Map<String, Int>, currentIdx: Int): Pair<AddressMode, Int> {
         val mode = when (arg[0]) {
             '#' -> AddressMode.IMMEDIATE
             '$' -> AddressMode.DIRECT
@@ -63,10 +92,31 @@ class RedcodeParser {
             else -> null
         }
 
-        val valStr = if (mode != null) arg.substring(1) else arg
+        val valPart = if (mode != null) arg.substring(1) else arg
         val addressMode = mode ?: AddressMode.DIRECT
-        val value = valStr.toIntOrNull() ?: throw Exception("Invalid value: $valStr")
+
+        // Simple arithmetic and label resolution
+        val value = resolveValue(valPart, labels, currentIdx)
 
         return addressMode to value
+    }
+
+    private fun resolveValue(part: String, labels: Map<String, Int>, currentIdx: Int): Int {
+        // Handle labels
+        if (labels.containsKey(part)) {
+            return labels[part]!! - currentIdx
+        }
+
+        // Handle basic arithmetic START+1
+        if (part.contains("+")) {
+            val subParts = part.split("+")
+            return resolveValue(subParts[0], labels, currentIdx) + resolveValue(subParts[1], labels, currentIdx)
+        }
+        if (part.contains("-") && !part.startsWith("-")) {
+            val subParts = part.split("-")
+            return resolveValue(subParts[0], labels, currentIdx) - resolveValue(subParts[1], labels, currentIdx)
+        }
+
+        return part.toIntOrNull() ?: 0
     }
 }

@@ -74,6 +74,7 @@ class UserSettingsRepository(private val dataStore: DataStore<Preferences>) {
         val powers = mutableSetOf<SpecialPower>()
         if (level >= 6) powers.add(SpecialPower.PROCESS_SHIELD)
         if (level >= 8) powers.add(SpecialPower.SPEED_BOOST)
+        if (level >= 10) powers.add(SpecialPower.REDUCE_PENALTY)
         return powers
     }
 }
