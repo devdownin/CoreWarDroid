@@ -1,7 +1,6 @@
 package com.example.corewar.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -30,13 +29,18 @@ data class EditorRoute(val initialName: String? = null, val initialCode: String?
 @Serializable
 object SettingsRoute
 
+@Serializable
+object HelpRoute
+
 @Composable
 fun App() {
-    MaterialTheme {
+    val userSettingsRepository: UserSettingsRepository = koinInject()
+    val theme by userSettingsRepository.theme.collectAsState("STANDARD")
+
+    CoreWarTheme(themeName = theme) {
         Surface(modifier = Modifier.fillMaxSize()) {
             val navController = rememberNavController()
             val warriorRepository: WarriorRepository = koinInject()
-            val userSettingsRepository: UserSettingsRepository = koinInject()
 
             NavHost(
                 navController = navController,
@@ -54,6 +58,9 @@ fun App() {
                         },
                         onOpenSettings = {
                             navController.navigate(SettingsRoute)
+                        },
+                        onOpenHelp = {
+                            navController.navigate(HelpRoute)
                         }
                     )
                 }
@@ -83,6 +90,12 @@ fun App() {
                 composable<SettingsRoute> {
                     SettingsScreen(
                         userSettingsRepository = userSettingsRepository,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable<HelpRoute> {
+                    HelpScreen(
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }
