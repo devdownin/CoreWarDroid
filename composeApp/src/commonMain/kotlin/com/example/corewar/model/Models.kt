@@ -43,7 +43,7 @@ data class MemoryCell(
 )
 
 enum class SpecialPower {
-    PROCESS_SHIELD, SPEED_BOOST
+    PROCESS_SHIELD, SPEED_BOOST, REDUCE_PENALTY
 }
 
 @Serializable
@@ -72,6 +72,18 @@ data class BattleState(
     val winnerId: Int? = null,
     val chaosMode: Boolean = false
 ) {
+    fun copy(
+        memory: Array<MemoryCell> = this.memory,
+        warriors: List<Warrior> = this.warriors,
+        cycle: Int = this.cycle,
+        maxCycles: Int = this.maxCycles,
+        status: BattleStatus = this.status,
+        winnerId: Int? = this.winnerId,
+        chaosMode: Boolean = this.chaosMode
+    ): BattleState {
+        return BattleState(memory, warriors, cycle, maxCycles, status, winnerId, chaosMode)
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is BattleState) return false
