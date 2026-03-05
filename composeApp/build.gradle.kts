@@ -55,6 +55,7 @@ kotlin {
                 implementation(libs.navigation.compose)
                 implementation(libs.sqldelight.runtime)
                 implementation(libs.datastore.core)
+                implementation(libs.okio)
             }
         }
         val androidMain by getting {
@@ -62,12 +63,12 @@ kotlin {
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.kotlinx.coroutines.android)
                 implementation(libs.koin.android)
-                implementation(libs.sqldelight.android_driver)
+                implementation(libs.sqldelight.android.driver)
             }
         }
         val wasmJsMain by getting {
             dependencies {
-                implementation(libs.sqldelight.web_driver)
+                implementation(libs.sqldelight.web.driver)
             }
         }
     }

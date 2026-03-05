@@ -55,13 +55,14 @@ class MarsEngine {
         if (state.status != BattleStatus.RUNNING) return state
 
         val memSize = state.memory.size
-        var currentMemory = state.memory.copyOf()
+        // Only copy memory once per cycle, not per instruction
+        val currentMemory = state.memory.copyOf()
         var currentWarriors = state.warriors.toMutableList()
 
         // Handle Chaos Mode events
         if (state.chaosMode && Random.nextInt(1000) == 0) {
             val chaosResult = handleChaosEvent(state.copy(memory = currentMemory, warriors = currentWarriors))
-            currentMemory = chaosResult.memory
+            chaosResult.memory.copyInto(currentMemory)
             currentWarriors = chaosResult.warriors.toMutableList()
         }
 
@@ -70,7 +71,6 @@ class MarsEngine {
             val threads = warrior.threads.toMutableList()
             if (threads.isEmpty()) continue
 
-            // Speed Boost check
             val executions = if (warrior.specialPowers.contains(SpecialPower.SPEED_BOOST) && Random.nextInt(10) == 0) 2 else 1
 
             repeat(executions) {
@@ -78,15 +78,13 @@ class MarsEngine {
                 val pc = threads.removeAt(0)
                 val cell = currentMemory[pc.mod(memSize)]
 
-                // Protected zone speed penalty
                 val penaltyChance = if (warrior.specialPowers.contains(SpecialPower.REDUCE_PENALTY)) 15 else 50
                 if (cell.type == CellType.PROTECTED && Random.nextInt(100) < penaltyChance) {
                     threads.add(0, pc)
                     return@repeat
                 }
 
-                val result = execute(cell.instruction, pc, warriorIdx, currentMemory, state.cycle)
-                currentMemory = result.memory
+                val result = executeInPlace(cell.instruction, pc, warriorIdx, currentMemory, state.cycle)
 
                 if (result.nextPc != null) {
                     threads.add(result.nextPc.mod(memSize))
@@ -95,7 +93,6 @@ class MarsEngine {
                     threads.add(it.mod(memSize))
                 }
 
-                // Process Shield logic
                 if (threads.isEmpty() && warrior.specialPowers.contains(SpecialPower.PROCESS_SHIELD) && !warrior.shieldUsed) {
                     threads.add(Random.nextInt(memSize))
                     currentWarriors[warriorIdx] = currentWarriors[warriorIdx].copy(shieldUsed = true)
@@ -140,15 +137,13 @@ class MarsEngine {
         }
     }
 
-    private data class ExecutionResult(
-        val memory: Array<MemoryCell>,
+    private data class InPlaceResult(
         val nextPc: Int?,
         val spawnPc: Int? = null
     )
 
-    private fun execute(instr: Instruction, pc: Int, ownerId: Int, memory: Array<MemoryCell>, cycle: Int): ExecutionResult {
-        val memSize = memory.size
-        val workingMemory = memory.copyOf()
+    private fun executeInPlace(instr: Instruction, pc: Int, ownerId: Int, workingMemory: Array<MemoryCell>, cycle: Int): InPlaceResult {
+        val memSize = workingMemory.size
 
         fun getAddr(mode: AddressMode, value: Int, currentPc: Int): Int {
             return when (mode) {
@@ -215,7 +210,7 @@ class MarsEngine {
         }
 
         return when (instr.opcode) {
-            Opcode.DAT -> ExecutionResult(workingMemory, null)
+            Opcode.DAT -> InPlaceResult(null)
             Opcode.MOV -> {
                 val srcAddr = getAddr(instr.modeA, instr.valueA, pc)
                 val destAddr = getAddr(instr.modeB, instr.valueB, pc)
@@ -226,7 +221,7 @@ class MarsEngine {
                 } else {
                     writeMemory(destAddr, workingMemory[srcAddr])
                 }
-                ExecutionResult(workingMemory, pc + 1)
+                InPlaceResult(pc + 1)
             }
             Opcode.ADD -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
@@ -234,7 +229,7 @@ class MarsEngine {
                 val targetCell = workingMemory[destAddr]
                 val newInstr = targetCell.instruction.copy(valueB = targetCell.instruction.valueB + valA)
                 writeMemory(destAddr, targetCell.copy(instruction = newInstr))
-                ExecutionResult(workingMemory, pc + 1)
+                InPlaceResult(pc + 1)
             }
             Opcode.SUB -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
@@ -242,7 +237,7 @@ class MarsEngine {
                 val targetCell = workingMemory[destAddr]
                 val newInstr = targetCell.instruction.copy(valueB = targetCell.instruction.valueB - valA)
                 writeMemory(destAddr, targetCell.copy(instruction = newInstr))
-                ExecutionResult(workingMemory, pc + 1)
+                InPlaceResult(pc + 1)
             }
             Opcode.MUL -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
@@ -250,42 +245,42 @@ class MarsEngine {
                 val targetCell = workingMemory[destAddr]
                 val newInstr = targetCell.instruction.copy(valueB = targetCell.instruction.valueB * valA)
                 writeMemory(destAddr, targetCell.copy(instruction = newInstr))
-                ExecutionResult(workingMemory, pc + 1)
+                InPlaceResult(pc + 1)
             }
             Opcode.DIV -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
                 val destAddr = getAddr(instr.modeB, instr.valueB, pc)
                 if (valA == 0) {
-                     ExecutionResult(workingMemory, null)
+                     InPlaceResult(null)
                 } else {
                     val targetCell = workingMemory[destAddr]
                     val newInstr = targetCell.instruction.copy(valueB = targetCell.instruction.valueB / valA)
                     writeMemory(destAddr, targetCell.copy(instruction = newInstr))
-                    ExecutionResult(workingMemory, pc + 1)
+                    InPlaceResult(pc + 1)
                 }
             }
             Opcode.MOD -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
                 val destAddr = getAddr(instr.modeB, instr.valueB, pc)
                 if (valA == 0) {
-                     ExecutionResult(workingMemory, null)
+                     InPlaceResult(null)
                 } else {
                     val targetCell = workingMemory[destAddr]
                     val newInstr = targetCell.instruction.copy(valueB = targetCell.instruction.valueB % valA)
                     writeMemory(destAddr, targetCell.copy(instruction = newInstr))
-                    ExecutionResult(workingMemory, pc + 1)
+                    InPlaceResult(pc + 1)
                 }
             }
-            Opcode.JMP -> ExecutionResult(workingMemory, getAddr(instr.modeA, instr.valueA, pc))
+            Opcode.JMP -> InPlaceResult(getAddr(instr.modeA, instr.valueA, pc))
             Opcode.JMZ -> {
                 val valB = getValue(instr.modeB, instr.valueB, pc, false)
-                if (valB == 0) ExecutionResult(workingMemory, getAddr(instr.modeA, instr.valueA, pc))
-                else ExecutionResult(workingMemory, pc + 1)
+                if (valB == 0) InPlaceResult(getAddr(instr.modeA, instr.valueA, pc))
+                else InPlaceResult(pc + 1)
             }
             Opcode.JMN -> {
                 val valB = getValue(instr.modeB, instr.valueB, pc, false)
-                if (valB != 0) ExecutionResult(workingMemory, getAddr(instr.modeA, instr.valueA, pc))
-                else ExecutionResult(workingMemory, pc + 1)
+                if (valB != 0) InPlaceResult(getAddr(instr.modeA, instr.valueA, pc))
+                else InPlaceResult(pc + 1)
             }
             Opcode.DJN -> {
                 val destBAddr = getAddr(instr.modeB, instr.valueB, pc)
@@ -293,23 +288,23 @@ class MarsEngine {
                 val newValueB = targetCell.instruction.valueB - 1
                 val newInstr = targetCell.instruction.copy(valueB = newValueB)
                 writeMemory(destBAddr, targetCell.copy(instruction = newInstr))
-                if (newValueB != 0) ExecutionResult(workingMemory, getAddr(instr.modeA, instr.valueA, pc))
-                else ExecutionResult(workingMemory, pc + 1)
+                if (newValueB != 0) InPlaceResult(getAddr(instr.modeA, instr.valueA, pc))
+                else InPlaceResult(pc + 1)
             }
-            Opcode.SPL -> ExecutionResult(workingMemory, pc + 1, getAddr(instr.modeA, instr.valueA, pc))
+            Opcode.SPL -> InPlaceResult(pc + 1, getAddr(instr.modeA, instr.valueA, pc))
             Opcode.CMP -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
                 val valB = getValue(instr.modeB, instr.valueB, pc, false)
-                if (valA == valB) ExecutionResult(workingMemory, pc + 2)
-                else ExecutionResult(workingMemory, pc + 1)
+                if (valA == valB) InPlaceResult(pc + 2)
+                else InPlaceResult(pc + 1)
             }
             Opcode.SLT -> {
                 val valA = getValue(instr.modeA, instr.valueA, pc, true)
                 val valB = getValue(instr.modeB, instr.valueB, pc, false)
-                if (valA < valB) ExecutionResult(workingMemory, pc + 2)
-                else ExecutionResult(workingMemory, pc + 1)
+                if (valA < valB) InPlaceResult(pc + 2)
+                else InPlaceResult(pc + 1)
             }
-            Opcode.NOP -> ExecutionResult(workingMemory, pc + 1)
+            Opcode.NOP -> InPlaceResult(pc + 1)
         }
     }
 
