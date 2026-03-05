@@ -19,7 +19,7 @@ val commonModule = module {
     single { WarriorRepository(get(), get()) }
     single { UserSettingsRepository(get()) }
 
-    viewModel { BattleViewModel(get(), get(), get()) }
+    viewModel { BattleViewModel(get(), get(), get(), get()) }
     viewModel { EditorViewModel(get(), get(), get()) }
 }
 

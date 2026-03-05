@@ -19,6 +19,7 @@ koin = "4.0.0"
 navigation-compose = "2.8.0-alpha10"
 sqldelight = "2.0.2"
 datastore = "1.1.1"
+okio = "3.9.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidx-core-ktx" }
@@ -41,6 +42,7 @@ sqldelight-android-driver = { group = "app.cash.sqldelight", name = "android-dri
 sqldelight-web-driver = { group = "app.cash.sqldelight", name = "web-worker-driver", version.ref = "sqldelight" }
 sqldelight-runtime = { group = "app.cash.sqldelight", name = "runtime", version.ref = "sqldelight" }
 datastore-core = { group = "androidx.datastore", name = "datastore-preferences-core", version.ref = "datastore" }
+okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
