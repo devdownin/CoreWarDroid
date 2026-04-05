@@ -31,7 +31,7 @@ class WarriorRepository(
     suspend fun saveBattleResult(winnerName: String?, warriors: List<String>, status: String) = withContext(Dispatchers.Default) {
         runCatching {
             queries.insertBattle(
-                timestamp = Clock.System.now().toEpochMilliseconds(),
+                timestamp = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
                 winner_name = winnerName,
                 warriors_involved = warriors.joinToString(","),
                 status = status

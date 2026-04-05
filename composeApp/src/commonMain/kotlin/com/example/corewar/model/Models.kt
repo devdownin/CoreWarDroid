@@ -86,19 +86,6 @@ data class BattleState(
     val events: List<BattleEvent> = emptyList(),
     val deadWarriors: List<Warrior> = emptyList()
 ) {
-    fun copy(
-        memory: Array<MemoryCell> = this.memory,
-        warriors: List<Warrior> = this.warriors,
-        cycle: Int = this.cycle,
-        maxCycles: Int = this.maxCycles,
-        status: BattleStatus = this.status,
-        winnerId: Int? = this.winnerId,
-        chaosMode: Boolean = this.chaosMode,
-        events: List<BattleEvent> = this.events,
-        deadWarriors: List<Warrior> = this.deadWarriors
-    ): BattleState {
-        return BattleState(memory, warriors, cycle, maxCycles, status, winnerId, chaosMode, events, deadWarriors)
-    }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

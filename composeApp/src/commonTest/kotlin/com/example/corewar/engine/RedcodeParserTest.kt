@@ -53,8 +53,11 @@ class RedcodeParserTest {
         val instructions = parser.parse(code)
 
         assertEquals(2, instructions.size)
-        assertEquals(2, instructions[0].valueA)
-        assertEquals(-1, instructions[0].valueB)
+        // START is at index 1, current is 0. Offset to START is 1.
+        // START+2 = 1 + 2 = 3
+        // START-1 = 1 - 1 = 0
+        assertEquals(3, instructions[0].valueA)
+        assertEquals(0, instructions[0].valueB)
     }
 
     @Test

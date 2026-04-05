@@ -18,6 +18,9 @@ import com.example.corewar.ui.viewmodel.BattleIntent
 import com.example.corewar.ui.viewmodel.BattleViewModel
 import com.example.corewar.model.BattleStatus
 import com.example.corewar.ui.SoundManager
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 
 @Composable
 fun BattleScreen(
@@ -49,45 +52,44 @@ fun BattleScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-        BattleHeader(uiState, onNavigateBack)
+            BattleHeader(uiState, onNavigateBack)
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            uiState.battleState?.let { battleState ->
-                MemoryVisualizer(
-                    state = battleState,
-                    onCellClick = { viewModel.handleIntent(BattleIntent.SelectCell(it)) }
-                )
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                uiState.battleState?.let { battleState ->
+                    MemoryVisualizer(
+                        state = battleState,
+                        onCellClick = { viewModel.handleIntent(BattleIntent.SelectCell(it)) }
+                    )
+                }
+
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = Color.Green)
+                }
             }
 
-            if (uiState.isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = Color.Green)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            BattleControls(uiState, viewModel)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(modifier = Modifier.weight(0.5f)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    WarriorDashboard(uiState)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    CellInspector(uiState)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                EventLog(uiState)
             }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        BattleControls(uiState, viewModel)
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(modifier = Modifier.weight(0.5f)) {
-            Column(modifier = Modifier.weight(1f)) {
-                WarriorDashboard(uiState)
-                Spacer(modifier = Modifier.height(8.dp))
-                CellInspector(uiState)
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            EventLog(uiState)
-        }
-    }
-
         }
     }
 
-    if (uiState.battleState?.status == BattleStatus.WARRIOR_WINS || uiState.battleState?.status == BattleStatus.DRAW) {
-        LaunchedEffect(uiState.battleState?.status) {
+    val status = uiState.battleState?.status
+    if (status == BattleStatus.WARRIOR_WINS || status == BattleStatus.DRAW) {
+        LaunchedEffect(status) {
             SoundManager.playSound("BATTLE_END")
         }
         BattleEndDialog(uiState, onNavigateBack)
@@ -161,11 +163,11 @@ fun EventLog(uiState: com.example.corewar.ui.viewmodel.BattleUiState) {
         color = Color.DarkGray.copy(alpha = 0.2f),
         border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f))
     ) {
-        androidx.compose.foundation.lazy.LazyColumn(
+        LazyColumn(
             modifier = Modifier.padding(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            androidx.compose.foundation.lazy.items(events) { event ->
+            items(events) { event ->
                 Text(
                     text = "[${event.cycle}] ${event.message}",
                     color = event.color?.let { Color(it.argb) } ?: Color.Gray,
