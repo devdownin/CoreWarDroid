@@ -17,7 +17,9 @@ data class EditorUiState(
     val isSaving: Boolean = false,
     val unlockedOpcodes: Set<Opcode> = emptySet(),
     val level: Int = 1,
-    val error: String? = null
+    val error: String? = null,
+    val fontSize: Int = 14,
+    val autocompleteEnabled: Boolean = true
 )
 
 sealed class EditorIntent {
@@ -43,10 +45,20 @@ class EditorViewModel(
 
     init {
         viewModelScope.launch {
-            combine(userSettingsRepository.totalXp, userSettingsRepository.unlockedSkills) { xp, skills ->
+            combine(
+                userSettingsRepository.totalXp,
+                userSettingsRepository.unlockedSkills,
+                userSettingsRepository.editorFontSize,
+                userSettingsRepository.autocompleteEnabled
+            ) { xp, skills, fontSize, autocomplete ->
                 val level = userSettingsRepository.getLevel(xp)
                 val unlocked = userSettingsRepository.getUnlockedOpcodes(level, skills)
-                _uiState.update { it.copy(level = level, unlockedOpcodes = unlocked) }
+                _uiState.update { it.copy(
+                    level = level,
+                    unlockedOpcodes = unlocked,
+                    fontSize = fontSize,
+                    autocompleteEnabled = autocomplete
+                ) }
             }.collect()
         }
     }

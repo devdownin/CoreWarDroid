@@ -28,6 +28,8 @@ fun RedcodeEditor(
     code: String,
     onCodeChanged: (String) -> Unit,
     errors: List<String>,
+    fontSize: Int = 14,
+    autocompleteEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var textFieldValue by remember(code) {
@@ -43,7 +45,7 @@ fun RedcodeEditor(
     val opcodes = Opcode.values().map { it.name }
     val currentLine = textFieldValue.text.substring(0, textFieldValue.selection.start).lines().lastOrNull() ?: ""
     val lastWord = currentLine.split(Regex("\\s+")).lastOrNull()?.uppercase() ?: ""
-    val suggestions = if (lastWord.length >= 2) {
+    val suggestions = if (autocompleteEnabled && lastWord.length >= 2) {
         opcodes.filter { it.startsWith(lastWord) && it != lastWord }
     } else emptyList()
 
@@ -108,7 +110,7 @@ fun RedcodeEditor(
             textStyle = TextStyle(
                 color = Color.Green,
                 fontFamily = FontFamily.Monospace,
-                fontSize = MaterialTheme.typography.bodyMedium.fontSize
+                fontSize = fontSize.sp
             ),
             cursorBrush = SolidColor(Color.Green),
             visualTransformation = { text ->

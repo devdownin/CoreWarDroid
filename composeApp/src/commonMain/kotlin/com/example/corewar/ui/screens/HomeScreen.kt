@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -120,10 +121,10 @@ fun Header(level: Int, xp: Int, onOpenSettings: () -> Unit, onOpenHelp: () -> Un
 
         Row {
             IconButton(onClick = onOpenAcademy) {
-                Text("🎓", fontSize = 24.sp)
+                Text("🎓", fontSize = 24.sp, modifier = Modifier.semantics { contentDescription = "Academy" })
             }
             IconButton(onClick = onOpenSettings) {
-                Text("⚙️", fontSize = 24.sp)
+                Text("⚙️", fontSize = 24.sp, modifier = Modifier.semantics { contentDescription = "Settings" })
             }
         }
     }

@@ -74,12 +74,14 @@ class BattleViewModel(
                 val level = userSettingsRepository.getLevel(xp)
                 val skills = userSettingsRepository.unlockedSkills.first()
                 val unlockedPowers = userSettingsRepository.getUnlockedPowers(level, skills)
+                val memSize = userSettingsRepository.memorySize.first()
+                val maxCycles = userSettingsRepository.maxCycles.first()
 
                 val warriors = warriorSources.map { (name, code) ->
                     name to parser.parse(code)
                 }
 
-                val initialState = engine.loadWarriors(warriors, chaosMode = chaosMode)
+                val initialState = engine.loadWarriors(warriors, memSize = memSize, maxCycles = maxCycles, chaosMode = chaosMode)
 
                 // Add powers to warriors based on level/skills
                 val stateWithPowers = initialState.copy(

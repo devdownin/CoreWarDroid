@@ -73,6 +73,8 @@ fun EditorScreen(
             code = uiState.code,
             onCodeChanged = { viewModel.handleIntent(EditorIntent.CodeChanged(it)) },
             errors = uiState.errors,
+            fontSize = uiState.fontSize,
+            autocompleteEnabled = uiState.autocompleteEnabled,
             modifier = Modifier.weight(1f)
         )
 

@@ -21,6 +21,10 @@ fun SettingsScreen(
 ) {
     val theme by userSettingsRepository.theme.collectAsStateWithLifecycle("STANDARD")
     val chaosMode by userSettingsRepository.chaosMode.collectAsStateWithLifecycle(false)
+    val memorySize by userSettingsRepository.memorySize.collectAsStateWithLifecycle(8000)
+    val maxCycles by userSettingsRepository.maxCycles.collectAsStateWithLifecycle(80000)
+    val editorFontSize by userSettingsRepository.editorFontSize.collectAsStateWithLifecycle(14)
+    val autocompleteEnabled by userSettingsRepository.autocompleteEnabled.collectAsStateWithLifecycle(true)
     val scope = rememberCoroutineScope()
 
     Column(
@@ -28,6 +32,7 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(Color.Black)
             .padding(16.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onNavigateBack) {
@@ -57,6 +62,44 @@ fun SettingsScreen(
         }
 
         HorizontalDivider(color = Color.DarkGray)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("CORE SIZE: $memorySize", color = Color.White, fontWeight = FontWeight.Bold)
+        Slider(
+            value = memorySize.toFloat(),
+            onValueChange = { scope.launch { userSettingsRepository.setMemorySize(it.toInt()) } },
+            valueRange = 1024f..16384f,
+            steps = 15
+        )
+
+        Text("MAX CYCLES: $maxCycles", color = Color.White, fontWeight = FontWeight.Bold)
+        Slider(
+            value = maxCycles.toFloat(),
+            onValueChange = { scope.launch { userSettingsRepository.setMaxCycles(it.toInt()) } },
+            valueRange = 10000f..200000f,
+            steps = 19
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text("EDITOR PREFERENCES", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("AUTOCOMPLETE", color = Color.White, fontWeight = FontWeight.Bold)
+            Switch(checked = autocompleteEnabled, onCheckedChange = { scope.launch { userSettingsRepository.setAutocompleteEnabled(it) } })
+        }
+
+        Text("FONT SIZE: $editorFontSize", color = Color.White, fontWeight = FontWeight.Bold)
+        Slider(
+            value = editorFontSize.toFloat(),
+            onValueChange = { scope.launch { userSettingsRepository.setEditorFontSize(it.toInt()) } },
+            valueRange = 8f..24f
+        )
 
         Spacer(modifier = Modifier.height(32.dp))
 

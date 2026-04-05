@@ -12,6 +12,10 @@ class UserSettingsRepository(private val dataStore: DataStore<Preferences>) {
     private val themeKey = stringPreferencesKey("theme")
     private val chaosModeKey = booleanPreferencesKey("chaos_mode")
     private val unlockedSkillsKey = stringSetPreferencesKey("unlocked_skills")
+    private val memorySizeKey = intPreferencesKey("memory_size")
+    private val maxCyclesKey = intPreferencesKey("max_cycles")
+    private val editorFontSizeKey = intPreferencesKey("editor_font_size")
+    private val autocompleteEnabledKey = booleanPreferencesKey("autocomplete_enabled")
 
     val totalXp: Flow<Int> = dataStore.data.map { preferences ->
         preferences[totalXpKey] ?: 0
@@ -29,6 +33,22 @@ class UserSettingsRepository(private val dataStore: DataStore<Preferences>) {
         preferences[unlockedSkillsKey] ?: emptySet()
     }
 
+    val memorySize: Flow<Int> = dataStore.data.map { preferences ->
+        preferences[memorySizeKey] ?: 8000
+    }
+
+    val maxCycles: Flow<Int> = dataStore.data.map { preferences ->
+        preferences[maxCyclesKey] ?: 80000
+    }
+
+    val editorFontSize: Flow<Int> = dataStore.data.map { preferences ->
+        preferences[editorFontSizeKey] ?: 14
+    }
+
+    val autocompleteEnabled: Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[autocompleteEnabledKey] ?: true
+    }
+
     suspend fun addXp(xp: Int) {
         runCatching {
             dataStore.edit { preferences ->
@@ -36,6 +56,22 @@ class UserSettingsRepository(private val dataStore: DataStore<Preferences>) {
                 preferences[totalXpKey] = currentXp + xp
             }
         }
+    }
+
+    suspend fun setMemorySize(size: Int) {
+        runCatching { dataStore.edit { it[memorySizeKey] = size } }
+    }
+
+    suspend fun setMaxCycles(cycles: Int) {
+        runCatching { dataStore.edit { it[maxCyclesKey] = cycles } }
+    }
+
+    suspend fun setEditorFontSize(size: Int) {
+        runCatching { dataStore.edit { it[editorFontSizeKey] = size } }
+    }
+
+    suspend fun setAutocompleteEnabled(enabled: Boolean) {
+        runCatching { dataStore.edit { it[autocompleteEnabledKey] = enabled } }
     }
 
     suspend fun setTheme(theme: String) {
