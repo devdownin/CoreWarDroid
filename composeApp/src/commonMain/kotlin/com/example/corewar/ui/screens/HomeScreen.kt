@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -19,6 +20,8 @@ import com.example.corewar.data.WarriorRepository
 import com.example.corewar.model.CoreWarColor
 import com.example.corewar.ui.components.ProceduralAvatar
 import com.example.corewar.ui.LocalCoreWarColors
+import com.example.corewar.ui.SoundManager
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.first
 
 @Composable
@@ -28,13 +31,14 @@ fun HomeScreen(
     onStartBattle: (List<Pair<String, String>>, Boolean) -> Unit,
     onOpenEditor: (String?, String?) -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenHelp: () -> Unit
+    onOpenHelp: () -> Unit,
+    onOpenAcademy: () -> Unit
 ) {
     var warriors by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
     var selectedWarriors by remember { mutableStateOf(setOf<Int>()) }
-    val totalXp by userSettingsRepository.totalXp.collectAsState(0)
+    val totalXp by userSettingsRepository.totalXp.collectAsStateWithLifecycle(0)
     val level = userSettingsRepository.getLevel(totalXp)
-    val chaosMode by userSettingsRepository.chaosMode.collectAsState(false)
+    val chaosMode by userSettingsRepository.chaosMode.collectAsStateWithLifecycle(false)
     val colors = LocalCoreWarColors.current
 
     LaunchedEffect(Unit) {
@@ -49,7 +53,13 @@ fun HomeScreen(
             .background(colors.background)
             .padding(16.dp)
     ) {
-        Header(level, totalXp, onOpenSettings, onOpenHelp)
+        Header(level, totalXp, onOpenSettings, onOpenHelp, onOpenAcademy = onOpenAcademy)
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        TextButton(onClick = { onOpenHelp() }) {
+             Text("VIEW DOCUMENTATION", color = colors.primary, fontSize = 10.sp)
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -78,6 +88,7 @@ fun HomeScreen(
         Button(
             onClick = {
                 val selected = selectedWarriors.map { warriors[it] }
+                SoundManager.playSound("ENGAGE")
                 onStartBattle(selected, chaosMode)
             },
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -90,14 +101,14 @@ fun HomeScreen(
 }
 
 @Composable
-fun Header(level: Int, xp: Int, onOpenSettings: () -> Unit, onOpenHelp: () -> Unit) {
+fun Header(level: Int, xp: Int, onOpenSettings: () -> Unit, onOpenHelp: () -> Unit, onOpenAcademy: () -> Unit) {
     val colors = LocalCoreWarColors.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
+        Column(modifier = Modifier.clickable { onOpenAcademy() }) {
             Text("ANOMALY MASTERY", color = colors.accent, fontWeight = FontWeight.Bold)
             Text("LVL $level", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
             LinearProgressIndicator(
@@ -109,11 +120,11 @@ fun Header(level: Int, xp: Int, onOpenSettings: () -> Unit, onOpenHelp: () -> Un
         }
 
         Row {
-            IconButton(onClick = onOpenHelp) {
-                Text("?", color = colors.primary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            IconButton(onClick = onOpenAcademy) {
+                Text("🎓", fontSize = 24.sp, modifier = Modifier.semantics { contentDescription = "Academy" })
             }
             IconButton(onClick = onOpenSettings) {
-                Text("⚙️", fontSize = 24.sp)
+                Text("⚙️", fontSize = 24.sp, modifier = Modifier.semantics { contentDescription = "Settings" })
             }
         }
     }

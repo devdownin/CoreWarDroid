@@ -18,7 +18,7 @@ class RedcodeParser {
             if (tokens.isEmpty()) return@forEach
 
             val firstToken = tokens[0].uppercase()
-            if (!Opcode.values().any { it.name == firstToken }) {
+            if (Opcode.entries.none { it.name == firstToken }) {
                 // It's a label
                 val labelName = tokens[0].removeSuffix(":")
                 labels[labelName] = instrCount
@@ -40,7 +40,7 @@ class RedcodeParser {
             val args: List<String>
 
             val firstToken = tokens[0].uppercase()
-            if (!Opcode.values().any { it.name == firstToken }) {
+            if (Opcode.entries.none { it.name == firstToken }) {
                 if (tokens.size == 1) return@forEach
                 opcodeToken = tokens[1]
                 args = tokens.drop(2)
@@ -49,7 +49,7 @@ class RedcodeParser {
                 args = tokens.drop(1)
             }
 
-            val opcode = Opcode.valueOf(opcodeToken.uppercase())
+            val opcode = Opcode.entries.find { it.name == opcodeToken.uppercase() } ?: Opcode.DAT
 
             val instr = when (args.size) {
                 0 -> Instruction(opcode)
@@ -102,21 +102,23 @@ class RedcodeParser {
     }
 
     private fun resolveValue(part: String, labels: Map<String, Int>, currentIdx: Int): Int {
-        // Handle labels
-        if (labels.containsKey(part)) {
-            return labels[part]!! - currentIdx
-        }
+        val trimmed = part.trim()
 
-        // Handle basic arithmetic START+1
-        if (part.contains("+")) {
-            val subParts = part.split("+")
+        // Handle basic arithmetic START+1 (with potential labels)
+        if (trimmed.contains("+")) {
+            val subParts = trimmed.split("+", limit = 2)
             return resolveValue(subParts[0], labels, currentIdx) + resolveValue(subParts[1], labels, currentIdx)
         }
-        if (part.contains("-") && !part.startsWith("-")) {
-            val subParts = part.split("-")
+        if (trimmed.contains("-") && !trimmed.startsWith("-")) {
+            val subParts = trimmed.split("-", limit = 2)
             return resolveValue(subParts[0], labels, currentIdx) - resolveValue(subParts[1], labels, currentIdx)
         }
 
-        return part.toIntOrNull() ?: 0
+        // Handle labels
+        if (labels.containsKey(trimmed)) {
+            return labels[trimmed]!! - currentIdx
+        }
+
+        return trimmed.toIntOrNull() ?: 0
     }
 }

@@ -63,6 +63,18 @@ enum class BattleStatus {
     IDLE, RUNNING, PAUSED, WARRIOR_WINS, DRAW
 }
 
+@Serializable
+data class BattleEvent(
+    val cycle: Int,
+    val type: EventType,
+    val message: String,
+    val color: CoreWarColor? = null
+)
+
+enum class EventType {
+    INFO, PROCESS_DEATH, MEMORY_OVERWRITE, WINNER
+}
+
 data class BattleState(
     val memory: Array<MemoryCell>,
     val warriors: List<Warrior>,
@@ -70,19 +82,10 @@ data class BattleState(
     val maxCycles: Int = 80000,
     val status: BattleStatus = BattleStatus.IDLE,
     val winnerId: Int? = null,
-    val chaosMode: Boolean = false
+    val chaosMode: Boolean = false,
+    val events: List<BattleEvent> = emptyList(),
+    val deadWarriors: List<Warrior> = emptyList()
 ) {
-    fun copy(
-        memory: Array<MemoryCell> = this.memory,
-        warriors: List<Warrior> = this.warriors,
-        cycle: Int = this.cycle,
-        maxCycles: Int = this.maxCycles,
-        status: BattleStatus = this.status,
-        winnerId: Int? = this.winnerId,
-        chaosMode: Boolean = this.chaosMode
-    ): BattleState {
-        return BattleState(memory, warriors, cycle, maxCycles, status, winnerId, chaosMode)
-    }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
