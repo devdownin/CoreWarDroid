@@ -19,6 +19,7 @@ import com.example.corewar.data.WarriorRepository
 import com.example.corewar.model.CoreWarColor
 import com.example.corewar.ui.components.ProceduralAvatar
 import com.example.corewar.ui.LocalCoreWarColors
+import com.example.corewar.ui.SoundManager
 import kotlinx.coroutines.flow.first
 
 @Composable
@@ -85,6 +86,7 @@ fun HomeScreen(
         Button(
             onClick = {
                 val selected = selectedWarriors.map { warriors[it] }
+                SoundManager.playSound("ENGAGE")
                 onStartBattle(selected, chaosMode)
             },
             modifier = Modifier.fillMaxWidth().height(56.dp),

@@ -15,6 +15,7 @@ import com.example.corewar.ui.components.MemoryVisualizer
 import com.example.corewar.ui.viewmodel.BattleIntent
 import com.example.corewar.ui.viewmodel.BattleViewModel
 import com.example.corewar.model.BattleStatus
+import com.example.corewar.ui.SoundManager
 
 @Composable
 fun BattleScreen(
@@ -70,6 +71,9 @@ fun BattleScreen(
     }
 
     if (uiState.battleState?.status == BattleStatus.WARRIOR_WINS || uiState.battleState?.status == BattleStatus.DRAW) {
+        LaunchedEffect(uiState.battleState?.status) {
+            SoundManager.playSound("BATTLE_END")
+        }
         BattleEndDialog(uiState, onNavigateBack)
     }
 }
@@ -125,6 +129,10 @@ fun BattleControls(uiState: com.example.corewar.ui.viewmodel.BattleUiState, view
 
         IconButton(onClick = { viewModel.handleIntent(BattleIntent.Restart) }) {
             Text("🔄", color = Color.White)
+        }
+
+        IconButton(onClick = { viewModel.handleIntent(BattleIntent.FastForwardToEnd) }) {
+            Text("⏭️", color = Color.White)
         }
     }
 }

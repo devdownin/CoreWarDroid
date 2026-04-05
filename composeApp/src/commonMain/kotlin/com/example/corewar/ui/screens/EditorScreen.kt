@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -15,6 +16,8 @@ import androidx.compose.ui.unit.sp
 import com.example.corewar.ui.components.RedcodeEditor
 import com.example.corewar.ui.viewmodel.EditorIntent
 import com.example.corewar.ui.viewmodel.EditorViewModel
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 
 @Composable
 fun EditorScreen(
@@ -24,6 +27,13 @@ fun EditorScreen(
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val clipboardManager = LocalClipboardManager.current
+
+    LaunchedEffect(Unit) {
+        viewModel.exportEvent.collect { json ->
+            clipboardManager.setText(AnnotatedString(json))
+        }
+    }
 
     LaunchedEffect(initialName, initialCode) {
         if (initialName != null && initialCode != null) {
@@ -36,6 +46,12 @@ fun EditorScreen(
             .fillMaxSize()
             .background(Color.Black)
             .padding(16.dp)
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.isCtrlPressed && keyEvent.key == Key.S) {
+                    viewModel.handleIntent(EditorIntent.SaveWarrior)
+                    true
+                } else false
+            }
     ) {
         EditorHeader(uiState, viewModel, onNavigateBack)
 
@@ -87,6 +103,10 @@ fun EditorFooter(uiState: com.example.corewar.ui.viewmodel.EditorUiState, viewMo
         Column(modifier = Modifier.weight(1f)) {
              Text("UNLOCKED OPCODES: ${uiState.unlockedOpcodes.joinToString(", ")}", color = Color.Gray, fontSize = 10.sp)
              Text("LEVEL: ${uiState.level}", color = Color.White, fontSize = 12.sp)
+        }
+
+        TextButton(onClick = { viewModel.handleIntent(EditorIntent.ExportWarrior) }) {
+             Text("EXPORT (COPY)", color = Color.Cyan, fontSize = 10.sp)
         }
     }
 }

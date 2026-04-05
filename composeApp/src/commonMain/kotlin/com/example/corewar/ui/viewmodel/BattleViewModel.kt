@@ -35,6 +35,7 @@ sealed class BattleIntent {
     data class SetSpeed(val speed: Long) : BattleIntent()
     data class SelectCell(val index: Int) : BattleIntent()
     object Restart : BattleIntent()
+    object FastForwardToEnd : BattleIntent()
 }
 
 class BattleViewModel(
@@ -58,6 +59,7 @@ class BattleViewModel(
             is BattleIntent.SetSpeed -> setSpeed(intent.speed)
             is BattleIntent.SelectCell -> selectCell(intent.index)
             BattleIntent.Restart -> restart()
+            BattleIntent.FastForwardToEnd -> fastForwardToEnd()
         }
     }
 
@@ -158,6 +160,20 @@ class BattleViewModel(
         battleJob?.cancel()
         lastSetup?.let { (warriors, chaos) ->
             startBattle(warriors, chaos)
+        }
+    }
+
+    private fun fastForwardToEnd() {
+        battleJob?.cancel()
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val state = _uiState.value.battleState ?: return@launch
+            var currentState = state
+            while (currentState.status == BattleStatus.RUNNING) {
+                currentState = engine.runBatch(currentState, 100)
+            }
+            _uiState.update { it.copy(battleState = currentState, isLoading = false) }
+            handleBattleEnd(currentState)
         }
     }
 }
