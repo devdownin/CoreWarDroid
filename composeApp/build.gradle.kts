@@ -51,10 +51,16 @@ kotlin {
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.koin.core)
                 implementation(libs.koin.compose)
+                implementation(libs.koin.compose.viewmodel)
                 implementation(libs.navigation.compose)
                 implementation(libs.sqldelight.runtime)
                 implementation(libs.datastore.core)
                 implementation(libs.okio)
+            }
+        }
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
             }
         }
         val androidMain by getting {
