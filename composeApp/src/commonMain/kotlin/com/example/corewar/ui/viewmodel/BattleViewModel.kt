@@ -17,7 +17,15 @@ data class BattleUiState(
     val xpGained: Int = 0,
     val isLoading: Boolean = false,
     val selectedCell: MemoryCell? = null,
-    val selectedCellIndex: Int? = null
+    val selectedCellIndex: Int? = null,
+    val warriorStats: Map<Int, WarriorStats> = emptyMap()
+)
+
+data class WarriorStats(
+    val initialThreads: Int,
+    val cellsOwned: Int,
+    val processesCreated: Int,
+    val survivalCycles: Int
 )
 
 sealed class BattleIntent {
@@ -55,8 +63,10 @@ class BattleViewModel(
     private fun startBattle(warriorSources: List<Pair<String, String>>, chaosMode: Boolean) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val level = userSettingsRepository.totalXp.first().let { userSettingsRepository.getLevel(it) }
-            val unlockedPowers = userSettingsRepository.getUnlockedPowers(level)
+            val xp = userSettingsRepository.totalXp.first()
+            val level = userSettingsRepository.getLevel(xp)
+            val skills = userSettingsRepository.unlockedSkills.first()
+            val unlockedPowers = userSettingsRepository.getUnlockedPowers(level, skills)
 
             val warriors = warriorSources.map { (name, code) ->
                 name to parser.parse(code)
@@ -64,7 +74,7 @@ class BattleViewModel(
 
             val initialState = engine.loadWarriors(warriors, chaosMode = chaosMode)
 
-            // Add powers to warriors based on level
+            // Add powers to warriors based on level/skills
             val stateWithPowers = initialState.copy(
                 warriors = initialState.warriors.map { it.copy(specialPowers = unlockedPowers) }
             )
@@ -101,7 +111,16 @@ class BattleViewModel(
         val warriorNames = state.warriors.map { it.name }
         warriorRepository.saveBattleResult(winnerName, warriorNames, state.status.name)
 
-        _uiState.update { it.copy(xpGained = xp) }
+        val finalStats = state.warriors.associate { warrior ->
+            warrior.id to WarriorStats(
+                initialThreads = 1,
+                cellsOwned = state.memory.count { it.ownerId == warrior.id },
+                processesCreated = 0, // Simplified for now
+                survivalCycles = state.cycle
+            )
+        }
+
+        _uiState.update { it.copy(xpGained = xp, warriorStats = finalStats) }
     }
 
     private fun step() {

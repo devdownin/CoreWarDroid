@@ -58,11 +58,15 @@ fun BattleScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        WarriorDashboard(uiState)
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        CellInspector(uiState)
+        Row(modifier = Modifier.weight(0.5f)) {
+            Column(modifier = Modifier.weight(1f)) {
+                WarriorDashboard(uiState)
+                Spacer(modifier = Modifier.height(8.dp))
+                CellInspector(uiState)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            EventLog(uiState)
+        }
     }
 
     if (uiState.battleState?.status == BattleStatus.WARRIOR_WINS || uiState.battleState?.status == BattleStatus.DRAW) {
@@ -122,25 +126,56 @@ fun BattleControls(uiState: com.example.corewar.ui.viewmodel.BattleUiState, view
 }
 
 @Composable
+fun EventLog(uiState: com.example.corewar.ui.viewmodel.BattleUiState) {
+    val events = uiState.battleState?.events?.reversed() ?: emptyList()
+    Surface(
+        modifier = Modifier.width(200.dp).fillMaxHeight(),
+        color = Color.DarkGray.copy(alpha = 0.2f),
+        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f))
+    ) {
+        androidx.compose.foundation.lazy.LazyColumn(
+            modifier = Modifier.padding(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            androidx.compose.foundation.lazy.items(events) { event ->
+                Text(
+                    text = "[${event.cycle}] ${event.message}",
+                    color = event.color?.let { Color(it.argb) } ?: Color.Gray,
+                    fontSize = 10.sp,
+                    lineHeight = 12.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun WarriorDashboard(uiState: com.example.corewar.ui.viewmodel.BattleUiState) {
+    val allWarriors = (uiState.battleState?.warriors ?: emptyList())
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        uiState.battleState?.warriors?.forEach { warrior ->
+        allWarriors.forEach { warrior ->
+            val isDead = warrior.threads.isEmpty()
             val warriorColor = Color(warrior.color.argb)
             Surface(
                 modifier = Modifier.weight(1f),
-                color = Color.DarkGray.copy(alpha = 0.3f),
-                border = BorderStroke(1.dp, warriorColor)
+                color = if (isDead) Color.Black else Color.DarkGray.copy(alpha = 0.3f),
+                border = BorderStroke(1.dp, if (isDead) Color.Gray else warriorColor)
             ) {
                 Column(modifier = Modifier.padding(8.dp)) {
-                    Text(warrior.name, color = warriorColor, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                    Text("THREADS: ${warrior.threads.size}", color = Color.White, fontSize = 12.sp)
-                    LinearProgressIndicator(
-                        progress = { if (warrior.threads.isEmpty()) 0f else 1f },
-                        modifier = Modifier.fillMaxWidth().height(2.dp),
-                        color = warriorColor
+                    Text(
+                        warrior.name,
+                        color = if (isDead) Color.Gray else warriorColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp,
+                        textDecoration = if (isDead) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                    )
+                    Text(
+                        if (isDead) "ELIMINATED" else "THREADS: ${warrior.threads.size}",
+                        color = if (isDead) Color.Red else Color.White,
+                        fontSize = 10.sp
                     )
                 }
             }
@@ -170,21 +205,50 @@ fun CellInspector(uiState: com.example.corewar.ui.viewmodel.BattleUiState) {
 fun BattleEndDialog(uiState: com.example.corewar.ui.viewmodel.BattleUiState, onNavigateBack: () -> Unit) {
     AlertDialog(
         onDismissRequest = {},
-        title = { Text("BATTLE ENDED", color = Color.Green) },
+        title = { Text("BATTLE ENDED", color = Color.Green, fontWeight = FontWeight.Bold) },
         text = {
-            Column {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 val winnerId = uiState.battleState?.winnerId
-                val statusText = if (winnerId != null) "WINNER: ${uiState.battleState?.warriors?.getOrNull(winnerId)?.name}" else "DRAW"
-                Text(statusText, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                val winner = winnerId?.let { uiState.battleState?.warriors?.getOrNull(it) }
+
+                Text(
+                    text = if (winner != null) "WINNER: ${winner.name}" else "DRAW",
+                    color = winner?.color?.let { Color(it.argb) } ?: Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("BATTLE STATISTICS", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("XP GAINED: +${uiState.xpGained}", color = Color.Magenta)
+
+                uiState.battleState?.warriors?.forEach { warrior ->
+                    val stats = uiState.warriorStats[warrior.id]
+                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                        Text(warrior.name, color = Color(warrior.color.argb), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Memory Owned:", color = Color.LightGray, fontSize = 12.sp)
+                            Text("${stats?.cellsOwned ?: 0} cells", color = Color.White, fontSize = 12.sp)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Survived:", color = Color.LightGray, fontSize = 12.sp)
+                            Text("${stats?.survivalCycles ?: 0} cycles", color = Color.White, fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("XP GAINED: +${uiState.xpGained}", color = Color.Magenta, fontWeight = FontWeight.Bold)
             }
         },
         confirmButton = {
-            Button(onClick = onNavigateBack) {
-                Text("BACK TO BASE")
+            Button(
+                onClick = onNavigateBack,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Green, contentColor = Color.Black)
+            ) {
+                Text("RETURN TO BASE")
             }
         },
-        containerColor = Color.DarkGray
+        containerColor = Color(0xFF1A1A1A)
     )
 }

@@ -32,6 +32,9 @@ object SettingsRoute
 @Serializable
 object HelpRoute
 
+@Serializable
+object AcademyRoute
+
 @Composable
 fun App() {
     val userSettingsRepository: UserSettingsRepository = koinInject()
@@ -61,6 +64,9 @@ fun App() {
                         },
                         onOpenHelp = {
                             navController.navigate(HelpRoute)
+                        },
+                        onOpenAcademy = {
+                            navController.navigate(AcademyRoute)
                         }
                     )
                 }
@@ -72,6 +78,13 @@ fun App() {
                         viewModel = viewModel,
                         warriors = route.warriors,
                         chaosMode = route.chaosMode,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable<AcademyRoute> {
+                    AcademyScreen(
+                        userSettingsRepository = userSettingsRepository,
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }

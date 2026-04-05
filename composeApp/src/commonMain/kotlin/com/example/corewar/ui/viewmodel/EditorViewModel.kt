@@ -42,11 +42,11 @@ class EditorViewModel(
 
     init {
         viewModelScope.launch {
-            userSettingsRepository.totalXp.collect { xp ->
+            combine(userSettingsRepository.totalXp, userSettingsRepository.unlockedSkills) { xp, skills ->
                 val level = userSettingsRepository.getLevel(xp)
-                val unlocked = userSettingsRepository.getUnlockedOpcodes(level)
+                val unlocked = userSettingsRepository.getUnlockedOpcodes(level, skills)
                 _uiState.update { it.copy(level = level, unlockedOpcodes = unlocked) }
-            }
+            }.collect()
         }
     }
 

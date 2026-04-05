@@ -28,7 +28,8 @@ fun HomeScreen(
     onStartBattle: (List<Pair<String, String>>, Boolean) -> Unit,
     onOpenEditor: (String?, String?) -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenHelp: () -> Unit
+    onOpenHelp: () -> Unit,
+    onOpenAcademy: () -> Unit
 ) {
     var warriors by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
     var selectedWarriors by remember { mutableStateOf(setOf<Int>()) }
@@ -49,7 +50,13 @@ fun HomeScreen(
             .background(colors.background)
             .padding(16.dp)
     ) {
-        Header(level, totalXp, onOpenSettings, onOpenHelp)
+        Header(level, totalXp, onOpenSettings, onOpenHelp, onOpenAcademy = onOpenAcademy)
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        TextButton(onClick = { onOpenHelp() }) {
+             Text("VIEW DOCUMENTATION", color = colors.primary, fontSize = 10.sp)
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -90,14 +97,14 @@ fun HomeScreen(
 }
 
 @Composable
-fun Header(level: Int, xp: Int, onOpenSettings: () -> Unit, onOpenHelp: () -> Unit) {
+fun Header(level: Int, xp: Int, onOpenSettings: () -> Unit, onOpenHelp: () -> Unit, onOpenAcademy: () -> Unit) {
     val colors = LocalCoreWarColors.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
+        Column(modifier = Modifier.clickable { onOpenAcademy() }) {
             Text("ANOMALY MASTERY", color = colors.accent, fontWeight = FontWeight.Bold)
             Text("LVL $level", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
             LinearProgressIndicator(
@@ -109,8 +116,8 @@ fun Header(level: Int, xp: Int, onOpenSettings: () -> Unit, onOpenHelp: () -> Un
         }
 
         Row {
-            IconButton(onClick = onOpenHelp) {
-                Text("?", color = colors.primary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            IconButton(onClick = onOpenAcademy) {
+                Text("🎓", fontSize = 24.sp)
             }
             IconButton(onClick = onOpenSettings) {
                 Text("⚙️", fontSize = 24.sp)

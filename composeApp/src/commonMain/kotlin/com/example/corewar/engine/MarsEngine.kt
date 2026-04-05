@@ -55,15 +55,22 @@ class MarsEngine {
         if (state.status != BattleStatus.RUNNING) return state
 
         val memSize = state.memory.size
-        // Only copy memory once per cycle, not per instruction
         val currentMemory = state.memory.copyOf()
         var currentWarriors = state.warriors.toMutableList()
+        val currentDeadWarriors = state.deadWarriors.toMutableList()
+        val currentEvents = state.events.toMutableList()
+
+        fun addEvent(type: EventType, message: String, color: CoreWarColor? = null) {
+            currentEvents.add(BattleEvent(state.cycle, type, message, color))
+            if (currentEvents.size > 50) currentEvents.removeAt(0)
+        }
 
         // Handle Chaos Mode events
         if (state.chaosMode && Random.nextInt(1000) == 0) {
             val chaosResult = handleChaosEvent(state.copy(memory = currentMemory, warriors = currentWarriors))
             chaosResult.memory.copyInto(currentMemory)
             currentWarriors = chaosResult.warriors.toMutableList()
+            addEvent(EventType.INFO, "CHAOS EVENT TRIGGERED", CoreWarColor(0xFFFF0000))
         }
 
         for (warriorIdx in currentWarriors.indices) {
@@ -84,11 +91,16 @@ class MarsEngine {
                     return@repeat
                 }
 
-                val result = executeInPlace(cell.instruction, pc, warriorIdx, currentMemory, state.cycle)
+                val result = executeInPlace(cell.instruction, pc, warriorIdx, currentMemory, state.cycle) { type, msg ->
+                    addEvent(type, msg, warrior.color)
+                }
 
                 if (result.nextPc != null) {
                     threads.add(result.nextPc.mod(memSize))
+                } else {
+                    addEvent(EventType.PROCESS_DEATH, "${warrior.name} process died at $pc")
                 }
+
                 result.spawnPc?.let {
                     threads.add(it.mod(memSize))
                 }
@@ -96,16 +108,35 @@ class MarsEngine {
                 if (threads.isEmpty() && warrior.specialPowers.contains(SpecialPower.PROCESS_SHIELD) && !warrior.shieldUsed) {
                     threads.add(Random.nextInt(memSize))
                     currentWarriors[warriorIdx] = currentWarriors[warriorIdx].copy(shieldUsed = true)
+                    addEvent(EventType.INFO, "${warrior.name} ACTIVATED PROCESS SHIELD", warrior.color)
                 }
             }
             currentWarriors[warriorIdx] = currentWarriors[warriorIdx].copy(threads = threads)
         }
 
-        val aliveWarriors = currentWarriors.filter { it.threads.isNotEmpty() }
+        // Detect newly dead warriors
+        val stillAlive = currentWarriors.filter { it.threads.isNotEmpty() }
+        currentWarriors.forEach { w ->
+            if (w.threads.isEmpty() && !currentDeadWarriors.any { it.id == w.id }) {
+                currentDeadWarriors.add(w)
+                addEvent(EventType.INFO, "WARRIOR ${w.name} ELIMINATED", w.color)
+            }
+        }
+
         val status = when {
-            aliveWarriors.isEmpty() -> BattleStatus.DRAW
-            aliveWarriors.size == 1 && state.warriors.size > 1 -> BattleStatus.WARRIOR_WINS
-            state.cycle >= state.maxCycles -> BattleStatus.DRAW
+            stillAlive.isEmpty() -> {
+                addEvent(EventType.INFO, "BATTLE ENDED IN A DRAW")
+                BattleStatus.DRAW
+            }
+            stillAlive.size == 1 && state.warriors.size > 1 -> {
+                val winner = stillAlive.first()
+                addEvent(EventType.WINNER, "${winner.name} WINS THE BATTLE", winner.color)
+                BattleStatus.WARRIOR_WINS
+            }
+            state.cycle >= state.maxCycles -> {
+                addEvent(EventType.INFO, "MAX CYCLES REACHED - DRAW")
+                BattleStatus.DRAW
+            }
             else -> BattleStatus.RUNNING
         }
 
@@ -114,7 +145,9 @@ class MarsEngine {
             warriors = currentWarriors,
             cycle = state.cycle + 1,
             status = status,
-            winnerId = if (status == BattleStatus.WARRIOR_WINS) aliveWarriors.first().id else null
+            winnerId = if (status == BattleStatus.WARRIOR_WINS) stillAlive.first().id else null,
+            events = currentEvents,
+            deadWarriors = currentDeadWarriors
         )
     }
 
@@ -142,7 +175,7 @@ class MarsEngine {
         val spawnPc: Int? = null
     )
 
-    private fun executeInPlace(instr: Instruction, pc: Int, ownerId: Int, workingMemory: Array<MemoryCell>, cycle: Int): InPlaceResult {
+    private fun executeInPlace(instr: Instruction, pc: Int, ownerId: Int, workingMemory: Array<MemoryCell>, cycle: Int, onEvent: (EventType, String) -> Unit): InPlaceResult {
         val memSize = workingMemory.size
 
         fun getAddr(mode: AddressMode, value: Int, currentPc: Int): Int {
@@ -202,9 +235,14 @@ class MarsEngine {
             val targetCell = workingMemory[target]
             if (targetCell.type == CellType.PROTECTED) return
 
+            if (targetCell.ownerId != null && targetCell.ownerId != ownerId) {
+                onEvent(EventType.MEMORY_OVERWRITE, "OVERWROTE CELL $target OWNED BY ${targetCell.ownerId}")
+            }
+
             var newCell = cell.copy(lastModifiedCycle = cycle, ownerId = ownerId, writeCount = targetCell.writeCount + 1)
             if (newCell.type == CellType.VOLATILE && newCell.writeCount >= 5) {
                 newCell = newCell.copy(instruction = Instruction(Opcode.DAT), ownerId = null)
+                onEvent(EventType.INFO, "VOLATILE CELL $target COLLAPSED")
             }
             workingMemory[target] = newCell
         }

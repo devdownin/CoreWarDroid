@@ -11,6 +11,7 @@ class UserSettingsRepository(private val dataStore: DataStore<Preferences>) {
     private val totalXpKey = intPreferencesKey("total_xp")
     private val themeKey = stringPreferencesKey("theme")
     private val chaosModeKey = booleanPreferencesKey("chaos_mode")
+    private val unlockedSkillsKey = stringSetPreferencesKey("unlocked_skills")
 
     val totalXp: Flow<Int> = dataStore.data.map { preferences ->
         preferences[totalXpKey] ?: 0
@@ -22,6 +23,10 @@ class UserSettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     val chaosMode: Flow<Boolean> = dataStore.data.map { preferences ->
         preferences[chaosModeKey] ?: false
+    }
+
+    val unlockedSkills: Flow<Set<String>> = dataStore.data.map { preferences ->
+        preferences[unlockedSkillsKey] ?: emptySet()
     }
 
     suspend fun addXp(xp: Int) {
@@ -45,7 +50,14 @@ class UserSettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     fun getLevel(xp: Int): Int = 1 + (xp / 100)
 
-    fun getUnlockedOpcodes(level: Int): Set<com.example.corewar.model.Opcode> {
+    suspend fun unlockSkill(skill: String) {
+        dataStore.edit { preferences ->
+            val current = preferences[unlockedSkillsKey] ?: emptySet()
+            preferences[unlockedSkillsKey] = current + skill
+        }
+    }
+
+    fun getUnlockedOpcodes(level: Int, unlockedSkills: Set<String>): Set<com.example.corewar.model.Opcode> {
         val unlocked = mutableSetOf(
             com.example.corewar.model.Opcode.MOV,
             com.example.corewar.model.Opcode.ADD,
@@ -55,25 +67,25 @@ class UserSettingsRepository(private val dataStore: DataStore<Preferences>) {
             com.example.corewar.model.Opcode.DJN,
             com.example.corewar.model.Opcode.DAT
         )
-        if (level >= 3) {
-            unlocked.add(com.example.corewar.model.Opcode.SPL)
+        if (unlockedSkills.contains("REPLICATION")) unlocked.add(com.example.corewar.model.Opcode.SPL)
+        if (unlockedSkills.contains("LOGIC")) {
             unlocked.add(com.example.corewar.model.Opcode.CMP)
             unlocked.add(com.example.corewar.model.Opcode.SLT)
         }
-        if (level >= 5) {
+        if (unlockedSkills.contains("ADVANCED_MATH")) {
             unlocked.add(com.example.corewar.model.Opcode.SUB)
             unlocked.add(com.example.corewar.model.Opcode.MUL)
             unlocked.add(com.example.corewar.model.Opcode.DIV)
             unlocked.add(com.example.corewar.model.Opcode.MOD)
-            unlocked.add(com.example.corewar.model.Opcode.NOP)
         }
+        if (level >= 5) unlocked.add(com.example.corewar.model.Opcode.NOP)
         return unlocked
     }
 
-    fun getUnlockedPowers(level: Int): Set<SpecialPower> {
+    fun getUnlockedPowers(level: Int, unlockedSkills: Set<String>): Set<SpecialPower> {
         val powers = mutableSetOf<SpecialPower>()
-        if (level >= 6) powers.add(SpecialPower.PROCESS_SHIELD)
-        if (level >= 8) powers.add(SpecialPower.SPEED_BOOST)
+        if (unlockedSkills.contains("SHIELD")) powers.add(SpecialPower.PROCESS_SHIELD)
+        if (unlockedSkills.contains("TURBO")) powers.add(SpecialPower.SPEED_BOOST)
         if (level >= 10) powers.add(SpecialPower.REDUCE_PENALTY)
         return powers
     }

@@ -66,7 +66,15 @@ fun MemoryVisualizer(
                 val col = index % cellsPerRow
 
                 val color = when {
-                    cell.ownerId != null -> Color(state.warriors[cell.ownerId].color.argb)
+                    cell.ownerId != null -> {
+                        val owner = state.warriors.find { it.id == cell.ownerId } ?: state.deadWarriors.find { it.id == cell.ownerId }
+                        if (owner != null) {
+                            val baseColor = Color(owner.color.argb)
+                            if (owner.threads.isEmpty()) baseColor.copy(alpha = 0.4f) else baseColor
+                        } else {
+                            Color.DarkGray
+                        }
+                    }
                     cell.type == CellType.PROTECTED -> Color.Blue.copy(alpha = 0.3f)
                     cell.type == CellType.VOLATILE -> Color.Red.copy(alpha = 0.3f)
                     else -> Color.DarkGray
