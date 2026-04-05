@@ -18,7 +18,8 @@ data class BattleUiState(
     val isLoading: Boolean = false,
     val selectedCell: MemoryCell? = null,
     val selectedCellIndex: Int? = null,
-    val warriorStats: Map<Int, WarriorStats> = emptyMap()
+    val warriorStats: Map<Int, WarriorStats> = emptyMap(),
+    val error: String? = null
 )
 
 data class WarriorStats(
@@ -52,6 +53,7 @@ class BattleViewModel(
     private var lastSetup: Pair<List<Pair<String, String>>, Boolean>? = null
 
     fun handleIntent(intent: BattleIntent) {
+        _uiState.update { it.copy(error = null) }
         when (intent) {
             is BattleIntent.StartBattle -> startBattle(intent.warriors, intent.chaosMode)
             BattleIntent.Step -> step()
@@ -67,24 +69,28 @@ class BattleViewModel(
         lastSetup = warriorSources to chaosMode
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val xp = userSettingsRepository.totalXp.first()
-            val level = userSettingsRepository.getLevel(xp)
-            val skills = userSettingsRepository.unlockedSkills.first()
-            val unlockedPowers = userSettingsRepository.getUnlockedPowers(level, skills)
+            runCatching {
+                val xp = userSettingsRepository.totalXp.first()
+                val level = userSettingsRepository.getLevel(xp)
+                val skills = userSettingsRepository.unlockedSkills.first()
+                val unlockedPowers = userSettingsRepository.getUnlockedPowers(level, skills)
 
-            val warriors = warriorSources.map { (name, code) ->
-                name to parser.parse(code)
+                val warriors = warriorSources.map { (name, code) ->
+                    name to parser.parse(code)
+                }
+
+                val initialState = engine.loadWarriors(warriors, chaosMode = chaosMode)
+
+                // Add powers to warriors based on level/skills
+                val stateWithPowers = initialState.copy(
+                    warriors = initialState.warriors.map { it.copy(specialPowers = unlockedPowers) }
+                )
+
+                _uiState.update { it.copy(battleState = stateWithPowers, isLoading = false) }
+                runBattleLoop()
+            }.onFailure { e ->
+                _uiState.update { it.copy(isLoading = false, error = "Failed to start battle: ${e.message}") }
             }
-
-            val initialState = engine.loadWarriors(warriors, chaosMode = chaosMode)
-
-            // Add powers to warriors based on level/skills
-            val stateWithPowers = initialState.copy(
-                warriors = initialState.warriors.map { it.copy(specialPowers = unlockedPowers) }
-            )
-
-            _uiState.update { it.copy(battleState = stateWithPowers, isLoading = false) }
-            runBattleLoop()
         }
     }
 

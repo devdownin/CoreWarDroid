@@ -43,8 +43,9 @@ fun App() {
     val userSettingsRepository: UserSettingsRepository = koinInject()
     val theme by userSettingsRepository.theme.collectAsStateWithLifecycle("STANDARD")
 
-    CoreWarTheme(themeName = theme) {
-        Surface(modifier = Modifier.fillMaxSize()) {
+    ErrorBoundary {
+        CoreWarTheme(themeName = theme) {
+            Surface(modifier = Modifier.fillMaxSize()) {
             val navController = rememberNavController()
             val warriorRepository: WarriorRepository = koinInject()
 

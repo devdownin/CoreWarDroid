@@ -29,6 +29,13 @@ fun EditorScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val clipboardManager = LocalClipboardManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            snackbarHostState.showSnackbar(it)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.exportEvent.collect { json ->
@@ -42,10 +49,14 @@ fun EditorScreen(
         }
     }
 
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = Color.Black
+    ) { padding ->
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .padding(padding)
             .padding(16.dp)
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown && keyEvent.isCtrlPressed && keyEvent.key == Key.S) {
@@ -68,6 +79,7 @@ fun EditorScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         EditorFooter(uiState, viewModel)
+    }
     }
 }
 

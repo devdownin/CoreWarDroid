@@ -16,7 +16,8 @@ data class EditorUiState(
     val errors: List<String> = emptyList(),
     val isSaving: Boolean = false,
     val unlockedOpcodes: Set<Opcode> = emptySet(),
-    val level: Int = 1
+    val level: Int = 1,
+    val error: String? = null
 )
 
 sealed class EditorIntent {
@@ -51,6 +52,7 @@ class EditorViewModel(
     }
 
     fun handleIntent(intent: EditorIntent) {
+        _uiState.update { it.copy(error = null) }
         when (intent) {
             is EditorIntent.CodeChanged -> onCodeChanged(intent.code)
             is EditorIntent.NameChanged -> onNameChanged(intent.name)
@@ -91,8 +93,12 @@ class EditorViewModel(
         if (currentState.errors.isEmpty() && currentState.name.isNotBlank()) {
             viewModelScope.launch {
                 _uiState.update { it.copy(isSaving = true) }
-                warriorRepository.saveWarrior(currentState.name, currentState.code)
-                _uiState.update { it.copy(isSaving = false) }
+                val result = warriorRepository.saveWarrior(currentState.name, currentState.code)
+                if (result.isSuccess) {
+                    _uiState.update { it.copy(isSaving = false) }
+                } else {
+                    _uiState.update { it.copy(isSaving = false, error = "Failed to save: ${result.exceptionOrNull()?.message}") }
+                }
             }
         }
     }

@@ -27,17 +27,28 @@ fun BattleScreen(
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            snackbarHostState.showSnackbar(it)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.handleIntent(BattleIntent.StartBattle(warriors, chaosMode))
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .padding(16.dp)
-    ) {
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = Color.Black
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+        ) {
         BattleHeader(uiState, onNavigateBack)
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -69,6 +80,9 @@ fun BattleScreen(
             }
             Spacer(modifier = Modifier.width(8.dp))
             EventLog(uiState)
+        }
+    }
+
         }
     }
 

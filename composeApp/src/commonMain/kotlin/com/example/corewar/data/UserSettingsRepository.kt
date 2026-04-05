@@ -30,30 +30,38 @@ class UserSettingsRepository(private val dataStore: DataStore<Preferences>) {
     }
 
     suspend fun addXp(xp: Int) {
-        dataStore.edit { preferences ->
-            val currentXp = preferences[totalXpKey] ?: 0
-            preferences[totalXpKey] = currentXp + xp
+        runCatching {
+            dataStore.edit { preferences ->
+                val currentXp = preferences[totalXpKey] ?: 0
+                preferences[totalXpKey] = currentXp + xp
+            }
         }
     }
 
     suspend fun setTheme(theme: String) {
-        dataStore.edit { preferences ->
-            preferences[themeKey] = theme
+        runCatching {
+            dataStore.edit { preferences ->
+                preferences[themeKey] = theme
+            }
         }
     }
 
     suspend fun setChaosMode(enabled: Boolean) {
-        dataStore.edit { preferences ->
-            preferences[chaosModeKey] = enabled
+        runCatching {
+            dataStore.edit { preferences ->
+                preferences[chaosModeKey] = enabled
+            }
         }
     }
 
     fun getLevel(xp: Int): Int = 1 + (xp / 100)
 
     suspend fun unlockSkill(skill: String) {
-        dataStore.edit { preferences ->
-            val current = preferences[unlockedSkillsKey] ?: emptySet()
-            preferences[unlockedSkillsKey] = current + skill
+        runCatching {
+            dataStore.edit { preferences ->
+                val current = preferences[unlockedSkillsKey] ?: emptySet()
+                preferences[unlockedSkillsKey] = current + skill
+            }
         }
     }
 

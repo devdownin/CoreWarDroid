@@ -17,28 +17,30 @@ class WarriorRepository(
     private val queries = database.warriorQueries
 
     suspend fun getAllWarriors() = withContext(Dispatchers.Default) {
-        queries.selectAllWarriors().executeAsList()
+        runCatching { queries.selectAllWarriors().executeAsList() }.getOrDefault(emptyList())
     }
 
     suspend fun saveWarrior(name: String, code: String) = withContext(Dispatchers.Default) {
-        queries.insertWarrior(name, code)
+        runCatching { queries.insertWarrior(name, code) }
     }
 
     suspend fun deleteWarrior(id: Long) = withContext(Dispatchers.Default) {
-        queries.deleteWarrior(id)
+        runCatching { queries.deleteWarrior(id) }
     }
 
     suspend fun saveBattleResult(winnerName: String?, warriors: List<String>, status: String) = withContext(Dispatchers.Default) {
-        queries.insertBattle(
-            timestamp = Clock.System.now().toEpochMilliseconds(),
-            winner_name = winnerName,
-            warriors_involved = warriors.joinToString(","),
-            status = status
-        )
+        runCatching {
+            queries.insertBattle(
+                timestamp = Clock.System.now().toEpochMilliseconds(),
+                winner_name = winnerName,
+                warriors_involved = warriors.joinToString(","),
+                status = status
+            )
+        }
     }
 
     suspend fun getAllBattles() = withContext(Dispatchers.Default) {
-        queries.selectAllBattles().executeAsList()
+        runCatching { queries.selectAllBattles().executeAsList() }.getOrDefault(emptyList())
     }
 
     fun exportWarriorToJson(name: String, code: String): String {
