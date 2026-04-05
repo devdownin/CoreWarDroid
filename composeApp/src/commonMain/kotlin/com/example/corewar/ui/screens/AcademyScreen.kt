@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.corewar.data.UserSettingsRepository
 import kotlinx.coroutines.launch
 
@@ -37,8 +38,8 @@ fun AcademyScreen(
     userSettingsRepository: UserSettingsRepository,
     onNavigateBack: () -> Unit
 ) {
-    val totalXp by userSettingsRepository.totalXp.collectAsState(0)
-    val unlockedSkills by userSettingsRepository.unlockedSkills.collectAsState(emptySet())
+    val totalXp by userSettingsRepository.totalXp.collectAsStateWithLifecycle(0)
+    val unlockedSkills by userSettingsRepository.unlockedSkills.collectAsStateWithLifecycle(emptySet())
     val level = userSettingsRepository.getLevel(totalXp)
     val scope = rememberCoroutineScope()
 

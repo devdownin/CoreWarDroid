@@ -18,6 +18,7 @@ import com.example.corewar.ui.viewmodel.EditorIntent
 import com.example.corewar.ui.viewmodel.EditorViewModel
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun EditorScreen(
@@ -26,7 +27,7 @@ fun EditorScreen(
     initialCode: String?,
     onNavigateBack: () -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val clipboardManager = LocalClipboardManager.current
 
     LaunchedEffect(Unit) {

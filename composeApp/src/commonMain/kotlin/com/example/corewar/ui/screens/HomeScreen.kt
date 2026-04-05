@@ -20,6 +20,7 @@ import com.example.corewar.model.CoreWarColor
 import com.example.corewar.ui.components.ProceduralAvatar
 import com.example.corewar.ui.LocalCoreWarColors
 import com.example.corewar.ui.SoundManager
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.first
 
 @Composable
@@ -34,9 +35,9 @@ fun HomeScreen(
 ) {
     var warriors by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
     var selectedWarriors by remember { mutableStateOf(setOf<Int>()) }
-    val totalXp by userSettingsRepository.totalXp.collectAsState(0)
+    val totalXp by userSettingsRepository.totalXp.collectAsStateWithLifecycle(0)
     val level = userSettingsRepository.getLevel(totalXp)
-    val chaosMode by userSettingsRepository.chaosMode.collectAsState(false)
+    val chaosMode by userSettingsRepository.chaosMode.collectAsStateWithLifecycle(false)
     val colors = LocalCoreWarColors.current
 
     LaunchedEffect(Unit) {

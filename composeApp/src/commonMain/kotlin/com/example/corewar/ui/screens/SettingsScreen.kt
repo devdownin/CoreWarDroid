@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.corewar.data.UserSettingsRepository
 import kotlinx.coroutines.launch
 
@@ -18,8 +19,8 @@ fun SettingsScreen(
     userSettingsRepository: UserSettingsRepository,
     onNavigateBack: () -> Unit
 ) {
-    val theme by userSettingsRepository.theme.collectAsState("STANDARD")
-    val chaosMode by userSettingsRepository.chaosMode.collectAsState(false)
+    val theme by userSettingsRepository.theme.collectAsStateWithLifecycle("STANDARD")
+    val chaosMode by userSettingsRepository.chaosMode.collectAsStateWithLifecycle(false)
     val scope = rememberCoroutineScope()
 
     Column(

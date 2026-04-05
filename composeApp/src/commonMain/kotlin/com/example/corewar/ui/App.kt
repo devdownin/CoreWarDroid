@@ -15,6 +15,7 @@ import com.example.corewar.data.WarriorRepository
 import com.example.corewar.ui.screens.*
 import com.example.corewar.ui.viewmodel.BattleViewModel
 import com.example.corewar.ui.viewmodel.EditorViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -40,7 +41,7 @@ object AcademyRoute
 @Composable
 fun App() {
     val userSettingsRepository: UserSettingsRepository = koinInject()
-    val theme by userSettingsRepository.theme.collectAsState("STANDARD")
+    val theme by userSettingsRepository.theme.collectAsStateWithLifecycle("STANDARD")
 
     CoreWarTheme(themeName = theme) {
         Surface(modifier = Modifier.fillMaxSize()) {
