@@ -90,7 +90,7 @@ class BattleViewModel(
 
     private fun runBattleLoop() {
         battleJob?.cancel()
-        battleJob = viewModelScope.launch {
+        battleJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
             val state = _uiState.value.battleState ?: return@launch
             engine.runWithDelay(state, _uiState.value.speed) { nextState ->
                 _uiState.update { it.copy(battleState = nextState) }
@@ -165,7 +165,7 @@ class BattleViewModel(
 
     private fun fastForwardToEnd() {
         battleJob?.cancel()
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
             _uiState.update { it.copy(isLoading = true) }
             val state = _uiState.value.battleState ?: return@launch
             var currentState = state

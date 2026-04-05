@@ -49,7 +49,7 @@ class RedcodeParser {
                 args = tokens.drop(1)
             }
 
-            val opcode = Opcode.valueOf(opcodeToken.uppercase())
+            val opcode = Opcode.values().find { it.name == opcodeToken.uppercase() } ?: Opcode.DAT
 
             val instr = when (args.size) {
                 0 -> Instruction(opcode)

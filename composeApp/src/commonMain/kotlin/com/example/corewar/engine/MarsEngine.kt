@@ -43,18 +43,117 @@ class MarsEngine {
     )
 
     fun runBatch(state: BattleState, cycles: Int): BattleState {
-        var currentState = state
-        repeat(cycles) {
-            if (currentState.status != BattleStatus.RUNNING) return currentState
-            currentState = step(currentState)
+        if (state.status != BattleStatus.RUNNING) return state
+
+        val memSize = state.memory.size
+        val workingMemory = state.memory.copyOf()
+        var currentWarriors = state.warriors.toMutableList()
+        val currentDeadWarriors = state.deadWarriors.toMutableList()
+        val currentEvents = state.events.toMutableList()
+        var currentCycle = state.cycle
+
+        fun addEvent(type: EventType, message: String, color: CoreWarColor? = null) {
+            currentEvents.add(BattleEvent(currentCycle, type, message, color))
+            if (currentEvents.size > 50) currentEvents.removeAt(0)
         }
-        return currentState
+
+        repeat(cycles) {
+            if (currentCycle >= state.maxCycles) return@repeat
+
+            // Handle Chaos
+            if (state.chaosMode && Random.nextInt(1000) == 0) {
+                 when (Random.nextInt(2)) {
+                    0 -> { // MEMORY GLITCH
+                        val pos = Random.nextInt(memSize)
+                        workingMemory[pos] = workingMemory[pos].copy(instruction = Instruction(Opcode.DAT), ownerId = null)
+                    }
+                    else -> { // PROCESS WARP
+                        currentWarriors = currentWarriors.map { warrior ->
+                            val newThreads = warrior.threads.map { Random.nextInt(memSize) }
+                            warrior.copy(threads = newThreads)
+                        }.toMutableList()
+                    }
+                }
+                addEvent(EventType.INFO, "CHAOS EVENT TRIGGERED", CoreWarColor(0xFFFF0000))
+            }
+
+            for (warriorIdx in currentWarriors.indices) {
+                val warrior = currentWarriors[warriorIdx]
+                val threads = warrior.threads.toMutableList()
+                if (threads.isEmpty()) continue
+
+                val executions = if (warrior.specialPowers.contains(SpecialPower.SPEED_BOOST) && Random.nextInt(10) == 0) 2 else 1
+                repeat(executions) {
+                    if (threads.isEmpty()) return@repeat
+                    val pc = threads.removeAt(0)
+                    val cell = workingMemory[pc.mod(memSize)]
+
+                    val penaltyChance = if (warrior.specialPowers.contains(SpecialPower.REDUCE_PENALTY)) 15 else 50
+                    if (cell.type == CellType.PROTECTED && Random.nextInt(100) < penaltyChance) {
+                        threads.add(0, pc)
+                        return@repeat
+                    }
+
+                    val result = executeInPlace(cell.instruction, pc, warriorIdx, workingMemory, currentCycle) { type, msg ->
+                        addEvent(type, msg, warrior.color)
+                    }
+
+                    if (result.nextPc != null) {
+                        threads.add(result.nextPc.mod(memSize))
+                    } else {
+                        addEvent(EventType.PROCESS_DEATH, "${warrior.name} process died at $pc")
+                    }
+
+                    result.spawnPc?.let {
+                        threads.add(it.mod(memSize))
+                    }
+
+                    if (threads.isEmpty() && warrior.specialPowers.contains(SpecialPower.PROCESS_SHIELD) && !warrior.shieldUsed) {
+                        threads.add(Random.nextInt(memSize))
+                        currentWarriors[warriorIdx] = currentWarriors[warriorIdx].copy(shieldUsed = true)
+                        addEvent(EventType.INFO, "${warrior.name} ACTIVATED PROCESS SHIELD", warrior.color)
+                    }
+                }
+                currentWarriors[warriorIdx] = currentWarriors[warriorIdx].copy(threads = threads)
+            }
+
+            // Detect deaths
+            currentWarriors.forEach { w ->
+                if (w.threads.isEmpty() && !currentDeadWarriors.any { it.id == w.id }) {
+                    currentDeadWarriors.add(w)
+                    addEvent(EventType.INFO, "WARRIOR ${w.name} ELIMINATED", w.color)
+                }
+            }
+
+            currentCycle++
+            val stillAliveCount = currentWarriors.count { it.threads.isNotEmpty() }
+            if (stillAliveCount <= 1 && state.warriors.size > 1) return@repeat
+        }
+
+        val stillAlive = currentWarriors.filter { it.threads.isNotEmpty() }
+        val status = when {
+            stillAlive.isEmpty() -> BattleStatus.DRAW
+            stillAlive.size == 1 && state.warriors.size > 1 -> BattleStatus.WARRIOR_WINS
+            currentCycle >= state.maxCycles -> BattleStatus.DRAW
+            else -> BattleStatus.RUNNING
+        }
+
+        return state.copy(
+            memory = workingMemory,
+            warriors = currentWarriors,
+            cycle = currentCycle,
+            status = status,
+            winnerId = if (status == BattleStatus.WARRIOR_WINS) stillAlive.first().id else null,
+            events = currentEvents,
+            deadWarriors = currentDeadWarriors
+        )
     }
 
     fun step(state: BattleState): BattleState {
         if (state.status != BattleStatus.RUNNING) return state
 
         val memSize = state.memory.size
+        // We still copy to keep BattleState immutable, but we can optimize the execution logic
         val currentMemory = state.memory.copyOf()
         var currentWarriors = state.warriors.toMutableList()
         val currentDeadWarriors = state.deadWarriors.toMutableList()
@@ -179,6 +278,7 @@ class MarsEngine {
         val memSize = workingMemory.size
 
         fun getAddr(mode: AddressMode, value: Int, currentPc: Int): Int {
+            if (workingMemory.isEmpty()) return 0
             return when (mode) {
                 AddressMode.IMMEDIATE -> currentPc
                 AddressMode.DIRECT -> (currentPc + value).mod(memSize)
@@ -250,7 +350,7 @@ class MarsEngine {
         return when (instr.opcode) {
             Opcode.DAT -> InPlaceResult(null)
             Opcode.MOV -> {
-                val srcAddr = getAddr(instr.modeA, instr.valueA, pc)
+                val srcAddr = getAddr(instr.modeA, instr.valueA, pc).mod(memSize)
                 val destAddr = getAddr(instr.modeB, instr.valueB, pc)
                 if (instr.modeA == AddressMode.IMMEDIATE) {
                     val targetCell = workingMemory[destAddr]
