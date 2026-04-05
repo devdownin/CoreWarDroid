@@ -43,6 +43,9 @@ sqldelight-web-driver = { group = "app.cash.sqldelight", name = "web-worker-driv
 sqldelight-runtime = { group = "app.cash.sqldelight", name = "runtime", version.ref = "sqldelight" }
 datastore-core = { group = "androidx.datastore", name = "datastore-preferences-core", version.ref = "datastore" }
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
+koin-test = { group = "io.insert-koin", name = "koin-test", version.ref = "koin" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+mockk = { group = "io.mockk", name = "mockk", version = "1.14.9" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
