@@ -20,6 +20,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.example.corewar.model.Opcode
 import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
 
 @Composable
@@ -29,10 +30,77 @@ fun RedcodeEditor(
     errors: List<String>,
     modifier: Modifier = Modifier
 ) {
+    var textFieldValue by remember(code) {
+        mutableStateOf(TextFieldValue(code, androidx.compose.ui.text.TextRange(code.length)))
+    }
+    val snippets = listOf(
+        "Imp" to "MOV 0, 1",
+        "Dwarf" to "ADD #4, 3\nMOV 2, @2\nJMP -2\nDAT #0, #0",
+        "Paper" to "SPL 1\nMOV -1, 1\nSPL 1",
+        "Bomb" to "DAT #0, #0"
+    )
+
+    val opcodes = Opcode.values().map { it.name }
+    val currentLine = textFieldValue.text.substring(0, textFieldValue.selection.start).lines().lastOrNull() ?: ""
+    val lastWord = currentLine.split(Regex("\\s+")).lastOrNull()?.uppercase() ?: ""
+    val suggestions = if (lastWord.length >= 2) {
+        opcodes.filter { it.startsWith(lastWord) && it != lastWord }
+    } else emptyList()
+
     Column(modifier = modifier.fillMaxSize().background(Color.Black)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().background(Color.DarkGray).padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("SNIPPETS:", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(4.dp))
+            snippets.forEach { (name, snippet) ->
+                androidx.compose.material3.SuggestionChip(
+                    onClick = { onCodeChanged(if (code.isBlank()) snippet else "$code\n$snippet") },
+                    label = { Text(name, fontSize = 10.sp) },
+                    border = null,
+                    colors = androidx.compose.material3.SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = Color.Magenta.copy(alpha = 0.2f),
+                        labelColor = Color.Magenta
+                    )
+                )
+            }
+        }
+
+        if (suggestions.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().background(Color.DarkGray).padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("AUTOCOMPLETE:", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(4.dp))
+                suggestions.forEach { suggestion ->
+                    androidx.compose.material3.SuggestionChip(
+                        onClick = {
+                            val before = textFieldValue.text.substring(0, textFieldValue.selection.start - lastWord.length)
+                            val after = textFieldValue.text.substring(textFieldValue.selection.start)
+                            val newText = before + suggestion + after
+                            val newCursor = before.length + suggestion.length
+                            textFieldValue = TextFieldValue(newText, androidx.compose.ui.text.TextRange(newCursor))
+                            onCodeChanged(newText)
+                        },
+                        label = { Text(suggestion, fontSize = 10.sp) },
+                        border = null,
+                        colors = androidx.compose.material3.SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = Color.Cyan.copy(alpha = 0.2f),
+                            labelColor = Color.Cyan
+                        )
+                    )
+                }
+            }
+        }
+
         BasicTextField(
-            value = code,
-            onValueChange = onCodeChanged,
+            value = textFieldValue,
+            onValueChange = {
+                textFieldValue = it
+                if (it.text != code) {
+                    onCodeChanged(it.text)
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)

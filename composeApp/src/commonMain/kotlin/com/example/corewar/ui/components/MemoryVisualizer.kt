@@ -26,11 +26,11 @@ fun MemoryVisualizer(
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     val transformState = rememberTransformableState { zoomChange, offsetChange, _ ->
-        scale *= zoomChange
+        scale = (scale * zoomChange).coerceIn(0.5f, 10f)
         offset += offsetChange
     }
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(Color(0xFF050505))) {
         val width = constraints.maxWidth.toFloat()
         val height = constraints.maxHeight.toFloat()
 

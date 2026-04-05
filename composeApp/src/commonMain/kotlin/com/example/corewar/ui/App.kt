@@ -1,5 +1,7 @@
 package com.example.corewar.ui
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
@@ -47,7 +49,9 @@ fun App() {
 
             NavHost(
                 navController = navController,
-                startDestination = HomeRoute
+                startDestination = HomeRoute,
+                enterTransition = { fadeIn(animationSpec = tween(400)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start) },
+                exitTransition = { fadeOut(animationSpec = tween(400)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End) }
             ) {
                 composable<HomeRoute> {
                     HomeScreen(

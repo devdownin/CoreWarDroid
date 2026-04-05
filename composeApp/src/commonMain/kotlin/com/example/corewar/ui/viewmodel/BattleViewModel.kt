@@ -48,6 +48,7 @@ class BattleViewModel(
     val uiState: StateFlow<BattleUiState> = _uiState.asStateFlow()
 
     private var battleJob: Job? = null
+    private var lastSetup: Pair<List<Pair<String, String>>, Boolean>? = null
 
     fun handleIntent(intent: BattleIntent) {
         when (intent) {
@@ -61,6 +62,7 @@ class BattleViewModel(
     }
 
     private fun startBattle(warriorSources: List<Pair<String, String>>, chaosMode: Boolean) {
+        lastSetup = warriorSources to chaosMode
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val xp = userSettingsRepository.totalXp.first()
@@ -154,6 +156,8 @@ class BattleViewModel(
 
     private fun restart() {
         battleJob?.cancel()
-        _uiState.update { BattleUiState() }
+        lastSetup?.let { (warriors, chaos) ->
+            startBattle(warriors, chaos)
+        }
     }
 }

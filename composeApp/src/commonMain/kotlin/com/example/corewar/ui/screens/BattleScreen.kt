@@ -122,6 +122,10 @@ fun BattleControls(uiState: com.example.corewar.ui.viewmodel.BattleUiState, view
         ) {
             Text("STEP")
         }
+
+        IconButton(onClick = { viewModel.handleIntent(BattleIntent.Restart) }) {
+            Text("🔄", color = Color.White)
+        }
     }
 }
 
@@ -205,9 +209,15 @@ fun CellInspector(uiState: com.example.corewar.ui.viewmodel.BattleUiState) {
 fun BattleEndDialog(uiState: com.example.corewar.ui.viewmodel.BattleUiState, onNavigateBack: () -> Unit) {
     AlertDialog(
         onDismissRequest = {},
-        title = { Text("BATTLE ENDED", color = Color.Green, fontWeight = FontWeight.Bold) },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("BATTLE REPORT", color = Color.Green, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("v1.0", color = Color.DarkGray, fontSize = 10.sp)
+            }
+        },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(androidx.compose.foundation.rememberScrollState())) {
                 val winnerId = uiState.battleState?.winnerId
                 val winner = winnerId?.let { uiState.battleState?.warriors?.getOrNull(it) }
 
@@ -222,17 +232,32 @@ fun BattleEndDialog(uiState: com.example.corewar.ui.viewmodel.BattleUiState, onN
                 Text("BATTLE STATISTICS", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
 
+                val memSize = uiState.battleState?.memory?.size ?: 1
                 uiState.battleState?.warriors?.forEach { warrior ->
                     val stats = uiState.warriorStats[warrior.id]
-                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                        Text(warrior.name, color = Color(warrior.color.argb), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    val coverage = (stats?.cellsOwned ?: 0).toFloat() / memSize
+
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(8.dp).background(Color(warrior.color.argb)))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(warrior.name, color = Color(warrior.color.argb), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+
+                        LinearProgressIndicator(
+                            progress = { coverage },
+                            modifier = Modifier.fillMaxWidth().height(4.dp).padding(vertical = 4.dp),
+                            color = Color(warrior.color.argb),
+                            trackColor = Color.DarkGray
+                        )
+
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Memory Owned:", color = Color.LightGray, fontSize = 12.sp)
-                            Text("${stats?.cellsOwned ?: 0} cells", color = Color.White, fontSize = 12.sp)
+                            Text("Dominance:", color = Color.Gray, fontSize = 11.sp)
+                            Text("${(coverage * 100).toInt()}%", color = Color.White, fontSize = 11.sp)
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Survived:", color = Color.LightGray, fontSize = 12.sp)
-                            Text("${stats?.survivalCycles ?: 0} cycles", color = Color.White, fontSize = 12.sp)
+                            Text("Survival:", color = Color.Gray, fontSize = 11.sp)
+                            Text("${stats?.survivalCycles ?: 0} cycles", color = Color.White, fontSize = 11.sp)
                         }
                     }
                 }

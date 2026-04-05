@@ -62,7 +62,13 @@ fun AcademyScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        TutorialSection()
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text("TECH TREE", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+
+        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             items(SkillTree) { skill ->
                 val isUnlocked = unlockedSkills.contains(skill.id)
                 val canUnlock = level >= skill.requiredLevel &&
