@@ -9,6 +9,9 @@ import org.w3c.dom.Worker
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.emptyPreferences
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import okio.Path.Companion.toPath
 
 actual fun platformModule(): Module = module {
@@ -16,10 +19,12 @@ actual fun platformModule(): Module = module {
         WebWorkerDriver(Worker("sqldelight-worker.js"))
     }
     single<DataStore<Preferences>> {
-        // Use an in-memory or simpler storage for WasmJs if persistent path is problematic
-        // In real KMP Wasm, a custom factory might be needed.
-        PreferenceDataStoreFactory.createWithPath {
-             "settings.preferences_pb".toPath()
+        object : DataStore<Preferences> {
+            override val data: Flow<Preferences> = flowOf(emptyPreferences())
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                val current = emptyPreferences()
+                return transform(current)
+            }
         }
     }
 }

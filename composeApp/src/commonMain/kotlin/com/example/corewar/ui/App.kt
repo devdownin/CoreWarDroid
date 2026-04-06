@@ -26,7 +26,10 @@ import androidx.navigation.toRoute
 object HomeRoute
 
 @Serializable
-data class BattleRoute(val warriors: List<Pair<String, String>>, val chaosMode: Boolean)
+data class WarriorSource(val name: String, val code: String)
+
+@Serializable
+data class BattleRoute(val warriors: List<WarriorSource>, val chaosMode: Boolean)
 
 @Serializable
 data class EditorRoute(val initialName: String? = null, val initialCode: String? = null)
