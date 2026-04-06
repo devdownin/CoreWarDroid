@@ -65,8 +65,7 @@ fun App() {
                             warriorRepository = warriorRepository,
                             userSettingsRepository = userSettingsRepository,
                             onStartBattle = { warriors, chaosMode ->
-                                val sources = warriors.map { WarriorSource(it.first, it.second) }
-                                navController.navigate(BattleRoute(sources, chaosMode))
+                                navController.navigate(BattleRoute(warriors, chaosMode))
                             },
                             onOpenEditor = { name, code ->
                                 navController.navigate(EditorRoute(name, code))
@@ -88,7 +87,7 @@ fun App() {
                         val viewModel: BattleViewModel = koinViewModel()
                         BattleScreen(
                             viewModel = viewModel,
-                            warriors = route.warriors.map { it.name to it.code },
+                            warriors = route.warriors,
                             chaosMode = route.chaosMode,
                             onNavigateBack = { navController.popBackStack() }
                         )
