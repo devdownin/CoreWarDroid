@@ -8,7 +8,6 @@ import org.koin.dsl.module
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.preferencesDataStoreFile
 
 actual fun platformModule(): Module = module {
     single<SqlDriver> {
@@ -16,7 +15,7 @@ actual fun platformModule(): Module = module {
     }
     single<DataStore<Preferences>> {
         androidx.datastore.preferences.core.PreferenceDataStoreFactory.create {
-            get<Context>().preferencesDataStoreFile("settings")
+            get<Context>().filesDir.resolve("settings.preferences_pb")
         }
     }
 }

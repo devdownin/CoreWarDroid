@@ -8,8 +8,8 @@ import com.example.corewar.engine.RedcodeParser
 import com.example.corewar.ui.viewmodel.BattleViewModel
 import com.example.corewar.ui.viewmodel.EditorViewModel
 import org.koin.core.module.Module
-import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
+import org.koin.core.module.dsl.viewModel
 
 val commonModule = module {
     single { MarsEngine() }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
+import androidx.compose.foundation.background
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -26,11 +27,11 @@ fun MemoryVisualizer(
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     val transformState = rememberTransformableState { zoomChange, offsetChange, _ ->
-        scale *= zoomChange
+        scale = (scale * zoomChange).coerceIn(0.5f, 10f)
         offset += offsetChange
     }
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(Color(0xFF050505))) {
         val width = constraints.maxWidth.toFloat()
         val height = constraints.maxHeight.toFloat()
 
@@ -66,7 +67,15 @@ fun MemoryVisualizer(
                 val col = index % cellsPerRow
 
                 val color = when {
-                    cell.ownerId != null -> Color(state.warriors[cell.ownerId].color.argb)
+                    cell.ownerId != null -> {
+                        val owner = state.warriors.find { it.id == cell.ownerId } ?: state.deadWarriors.find { it.id == cell.ownerId }
+                        if (owner != null) {
+                            val baseColor = Color(owner.color.argb)
+                            if (owner.threads.isEmpty()) baseColor.copy(alpha = 0.4f) else baseColor
+                        } else {
+                            Color.DarkGray
+                        }
+                    }
                     cell.type == CellType.PROTECTED -> Color.Blue.copy(alpha = 0.3f)
                     cell.type == CellType.VOLATILE -> Color.Red.copy(alpha = 0.3f)
                     else -> Color.DarkGray

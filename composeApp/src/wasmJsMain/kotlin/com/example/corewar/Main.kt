@@ -12,7 +12,10 @@ fun main() {
     startKoin {
         modules(commonModule, platformModule())
     }
-    CanvasBasedWindow("CoreWar KMP") {
+    CanvasBasedWindow(
+        title = "CoreWar KMP",
+        canvasElementId = "ComposeTarget"
+    ) {
         App()
     }
 }

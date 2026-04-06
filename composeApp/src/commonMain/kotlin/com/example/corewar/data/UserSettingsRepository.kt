@@ -11,6 +11,11 @@ class UserSettingsRepository(private val dataStore: DataStore<Preferences>) {
     private val totalXpKey = intPreferencesKey("total_xp")
     private val themeKey = stringPreferencesKey("theme")
     private val chaosModeKey = booleanPreferencesKey("chaos_mode")
+    private val unlockedSkillsKey = stringSetPreferencesKey("unlocked_skills")
+    private val memorySizeKey = intPreferencesKey("memory_size")
+    private val maxCyclesKey = intPreferencesKey("max_cycles")
+    private val editorFontSizeKey = intPreferencesKey("editor_font_size")
+    private val autocompleteEnabledKey = booleanPreferencesKey("autocomplete_enabled")
 
     val totalXp: Flow<Int> = dataStore.data.map { preferences ->
         preferences[totalXpKey] ?: 0
@@ -24,28 +29,79 @@ class UserSettingsRepository(private val dataStore: DataStore<Preferences>) {
         preferences[chaosModeKey] ?: false
     }
 
+    val unlockedSkills: Flow<Set<String>> = dataStore.data.map { preferences ->
+        preferences[unlockedSkillsKey] ?: emptySet()
+    }
+
+    val memorySize: Flow<Int> = dataStore.data.map { preferences ->
+        preferences[memorySizeKey] ?: 8000
+    }
+
+    val maxCycles: Flow<Int> = dataStore.data.map { preferences ->
+        preferences[maxCyclesKey] ?: 80000
+    }
+
+    val editorFontSize: Flow<Int> = dataStore.data.map { preferences ->
+        preferences[editorFontSizeKey] ?: 14
+    }
+
+    val autocompleteEnabled: Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[autocompleteEnabledKey] ?: true
+    }
+
     suspend fun addXp(xp: Int) {
-        dataStore.edit { preferences ->
-            val currentXp = preferences[totalXpKey] ?: 0
-            preferences[totalXpKey] = currentXp + xp
+        runCatching {
+            dataStore.edit { preferences ->
+                val currentXp = preferences[totalXpKey] ?: 0
+                preferences[totalXpKey] = currentXp + xp
+            }
         }
     }
 
+    suspend fun setMemorySize(size: Int) {
+        runCatching { dataStore.edit { it[memorySizeKey] = size } }
+    }
+
+    suspend fun setMaxCycles(cycles: Int) {
+        runCatching { dataStore.edit { it[maxCyclesKey] = cycles } }
+    }
+
+    suspend fun setEditorFontSize(size: Int) {
+        runCatching { dataStore.edit { it[editorFontSizeKey] = size } }
+    }
+
+    suspend fun setAutocompleteEnabled(enabled: Boolean) {
+        runCatching { dataStore.edit { it[autocompleteEnabledKey] = enabled } }
+    }
+
     suspend fun setTheme(theme: String) {
-        dataStore.edit { preferences ->
-            preferences[themeKey] = theme
+        runCatching {
+            dataStore.edit { preferences ->
+                preferences[themeKey] = theme
+            }
         }
     }
 
     suspend fun setChaosMode(enabled: Boolean) {
-        dataStore.edit { preferences ->
-            preferences[chaosModeKey] = enabled
+        runCatching {
+            dataStore.edit { preferences ->
+                preferences[chaosModeKey] = enabled
+            }
         }
     }
 
     fun getLevel(xp: Int): Int = 1 + (xp / 100)
 
-    fun getUnlockedOpcodes(level: Int): Set<com.example.corewar.model.Opcode> {
+    suspend fun unlockSkill(skill: String) {
+        runCatching {
+            dataStore.edit { preferences ->
+                val current = preferences[unlockedSkillsKey] ?: emptySet()
+                preferences[unlockedSkillsKey] = current + skill
+            }
+        }
+    }
+
+    fun getUnlockedOpcodes(level: Int, unlockedSkills: Set<String>): Set<com.example.corewar.model.Opcode> {
         val unlocked = mutableSetOf(
             com.example.corewar.model.Opcode.MOV,
             com.example.corewar.model.Opcode.ADD,
@@ -55,25 +111,25 @@ class UserSettingsRepository(private val dataStore: DataStore<Preferences>) {
             com.example.corewar.model.Opcode.DJN,
             com.example.corewar.model.Opcode.DAT
         )
-        if (level >= 3) {
-            unlocked.add(com.example.corewar.model.Opcode.SPL)
+        if (unlockedSkills.contains("REPLICATION")) unlocked.add(com.example.corewar.model.Opcode.SPL)
+        if (unlockedSkills.contains("LOGIC")) {
             unlocked.add(com.example.corewar.model.Opcode.CMP)
             unlocked.add(com.example.corewar.model.Opcode.SLT)
         }
-        if (level >= 5) {
+        if (unlockedSkills.contains("ADVANCED_MATH")) {
             unlocked.add(com.example.corewar.model.Opcode.SUB)
             unlocked.add(com.example.corewar.model.Opcode.MUL)
             unlocked.add(com.example.corewar.model.Opcode.DIV)
             unlocked.add(com.example.corewar.model.Opcode.MOD)
-            unlocked.add(com.example.corewar.model.Opcode.NOP)
         }
+        if (level >= 5) unlocked.add(com.example.corewar.model.Opcode.NOP)
         return unlocked
     }
 
-    fun getUnlockedPowers(level: Int): Set<SpecialPower> {
+    fun getUnlockedPowers(level: Int, unlockedSkills: Set<String>): Set<SpecialPower> {
         val powers = mutableSetOf<SpecialPower>()
-        if (level >= 6) powers.add(SpecialPower.PROCESS_SHIELD)
-        if (level >= 8) powers.add(SpecialPower.SPEED_BOOST)
+        if (unlockedSkills.contains("SHIELD")) powers.add(SpecialPower.PROCESS_SHIELD)
+        if (unlockedSkills.contains("TURBO")) powers.add(SpecialPower.SPEED_BOOST)
         if (level >= 10) powers.add(SpecialPower.REDUCE_PENALTY)
         return powers
     }

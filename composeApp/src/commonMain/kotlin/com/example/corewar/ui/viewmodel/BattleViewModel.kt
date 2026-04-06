@@ -17,7 +17,16 @@ data class BattleUiState(
     val xpGained: Int = 0,
     val isLoading: Boolean = false,
     val selectedCell: MemoryCell? = null,
-    val selectedCellIndex: Int? = null
+    val selectedCellIndex: Int? = null,
+    val warriorStats: Map<Int, WarriorStats> = emptyMap(),
+    val error: String? = null
+)
+
+data class WarriorStats(
+    val initialThreads: Int,
+    val cellsOwned: Int,
+    val processesCreated: Int,
+    val survivalCycles: Int
 )
 
 sealed class BattleIntent {
@@ -27,6 +36,7 @@ sealed class BattleIntent {
     data class SetSpeed(val speed: Long) : BattleIntent()
     data class SelectCell(val index: Int) : BattleIntent()
     object Restart : BattleIntent()
+    object FastForwardToEnd : BattleIntent()
 }
 
 class BattleViewModel(
@@ -40,8 +50,10 @@ class BattleViewModel(
     val uiState: StateFlow<BattleUiState> = _uiState.asStateFlow()
 
     private var battleJob: Job? = null
+    private var lastSetup: Pair<List<Pair<String, String>>, Boolean>? = null
 
     fun handleIntent(intent: BattleIntent) {
+        _uiState.update { it.copy(error = null) }
         when (intent) {
             is BattleIntent.StartBattle -> startBattle(intent.warriors, intent.chaosMode)
             BattleIntent.Step -> step()
@@ -49,34 +61,44 @@ class BattleViewModel(
             is BattleIntent.SetSpeed -> setSpeed(intent.speed)
             is BattleIntent.SelectCell -> selectCell(intent.index)
             BattleIntent.Restart -> restart()
+            BattleIntent.FastForwardToEnd -> fastForwardToEnd()
         }
     }
 
     private fun startBattle(warriorSources: List<Pair<String, String>>, chaosMode: Boolean) {
+        lastSetup = warriorSources to chaosMode
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val level = userSettingsRepository.totalXp.first().let { userSettingsRepository.getLevel(it) }
-            val unlockedPowers = userSettingsRepository.getUnlockedPowers(level)
+            runCatching {
+                val xp = userSettingsRepository.totalXp.first()
+                val level = userSettingsRepository.getLevel(xp)
+                val skills = userSettingsRepository.unlockedSkills.first()
+                val unlockedPowers = userSettingsRepository.getUnlockedPowers(level, skills)
+                val memSize = userSettingsRepository.memorySize.first()
+                val maxCycles = userSettingsRepository.maxCycles.first()
 
-            val warriors = warriorSources.map { (name, code) ->
-                name to parser.parse(code)
+                val warriors = warriorSources.map { (name, code) ->
+                    name to parser.parse(code)
+                }
+
+                val initialState = engine.loadWarriors(warriors, memSize = memSize, maxCycles = maxCycles, chaosMode = chaosMode)
+
+                // Add powers to warriors based on level/skills
+                val stateWithPowers = initialState.copy(
+                    warriors = initialState.warriors.map { it.copy(specialPowers = unlockedPowers) }
+                )
+
+                _uiState.update { it.copy(battleState = stateWithPowers, isLoading = false) }
+                runBattleLoop()
+            }.onFailure { e ->
+                _uiState.update { it.copy(isLoading = false, error = "Failed to start battle: ${e.message}") }
             }
-
-            val initialState = engine.loadWarriors(warriors, chaosMode = chaosMode)
-
-            // Add powers to warriors based on level
-            val stateWithPowers = initialState.copy(
-                warriors = initialState.warriors.map { it.copy(specialPowers = unlockedPowers) }
-            )
-
-            _uiState.update { it.copy(battleState = stateWithPowers, isLoading = false) }
-            runBattleLoop()
         }
     }
 
     private fun runBattleLoop() {
         battleJob?.cancel()
-        battleJob = viewModelScope.launch {
+        battleJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
             val state = _uiState.value.battleState ?: return@launch
             engine.runWithDelay(state, _uiState.value.speed) { nextState ->
                 _uiState.update { it.copy(battleState = nextState) }
@@ -101,7 +123,16 @@ class BattleViewModel(
         val warriorNames = state.warriors.map { it.name }
         warriorRepository.saveBattleResult(winnerName, warriorNames, state.status.name)
 
-        _uiState.update { it.copy(xpGained = xp) }
+        val finalStats = state.warriors.associate { warrior ->
+            warrior.id to WarriorStats(
+                initialThreads = 1,
+                cellsOwned = state.memory.count { it.ownerId == warrior.id },
+                processesCreated = 0, // Simplified for now
+                survivalCycles = state.cycle
+            )
+        }
+
+        _uiState.update { it.copy(xpGained = xp, warriorStats = finalStats) }
     }
 
     private fun step() {
@@ -135,6 +166,22 @@ class BattleViewModel(
 
     private fun restart() {
         battleJob?.cancel()
-        _uiState.update { BattleUiState() }
+        lastSetup?.let { (warriors, chaos) ->
+            startBattle(warriors, chaos)
+        }
+    }
+
+    private fun fastForwardToEnd() {
+        battleJob?.cancel()
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            _uiState.update { it.copy(isLoading = true) }
+            val state = _uiState.value.battleState ?: return@launch
+            var currentState = state
+            while (currentState.status == BattleStatus.RUNNING) {
+                currentState = engine.runBatch(currentState, 100)
+            }
+            _uiState.update { it.copy(battleState = currentState, isLoading = false) }
+            handleBattleEnd(currentState)
+        }
     }
 }
